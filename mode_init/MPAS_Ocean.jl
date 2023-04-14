@@ -13,14 +13,7 @@ mutable struct MPAS_Ocean
     
     layerThickness::Array{Float64,2}
     layerThicknessTendency::Array{Float64,2}
-    
-    
     layerThicknessEdge::Array{Float64,2}
-    
-    # (ssh used to be prognostic for single-layer, now each has its own layerthickness
-    sshCurrent::Array{Float64,1}    # sea surface height (cell-centered)
-#     sshTendency::Array{Float64,1}    # tendency (cell-centered)
-
     
 
     bottomDepth::Array{Float64,1}   # bathymetry (cell-centered)
@@ -52,6 +45,12 @@ mutable struct MPAS_Ocean
     gridSpacing::Array{Float64,1}   
     boundaryCell::Array{Int64,2}  # 0 for inner cells, 1 for boundary cells (cell-centered)
     cellMask::Array{Int64,2}
+    vertAleTransportTop::Array{Float64,2}
+    ALE_thickness::Array{Float64,2}
+    restingThickness::Array{Float64,2}
+    vertCoordMovementWeights::Array{Float64,1}         
+    div_hu::Array{Float64,2}
+    sshCurrent::Array{Float64,1}    # sea surface height (cell-centered)
 
 
     ## edge-centered arrays
@@ -244,6 +243,13 @@ mutable struct MPAS_Ocean
         mpasOcean.layerThickness = zeros(Float64, (mpasOcean.nVertLevels, nCells))
         mpasOcean.layerThicknessTendency = zeros(Float64, (mpasOcean.nVertLevels, nCells))
         mpasOcean.layerThicknessEdge = zeros(Float64, (mpasOcean.nVertLevels, nEdges))
+
+
+        mpasOcean.restingThickness = zeros(Float64, (mpasOcean.nVertLevels, nCells))
+        mpasOcean.vertCoordMovementWeights = zeros(Float64, mpasOcean.nVertLevels)
+        mpasOcean.ALE_thickness = zeros(Float64, (mpasOcean.nVertLevels, nCells))
+        mpasOcean.vertAleTransportTop= zeros(Float64, (mpasOcean.nVertLevels+1, nCells))
+        mpasOcean.div_hu = zeros(Float64, (mpasOcean.nVertLevels, nCells))
         
         
         # define coriolis parameter and bottom depth.
@@ -261,7 +267,9 @@ mutable struct MPAS_Ocean
         for k in 1:mpasOcean.nVertLevels
             mpasOcean.layerThickness[k,:] .= mpasOcean.bottomDepth[:] ./ mpasOcean.nVertLevels
             mpasOcean.layerThicknessEdge[k,:] .= mpasOcean.bottomDepthEdge[:] ./ mpasOcean.nVertLevels
+            mpasOcean.restingThickness[k,:] .= mpasOcean.bottomDepth[:] ./ mpasOcean.nVertLevels
         end
+        mpasOcean.vertCoordMovementWeights[:] .= 1.0
         
         
         mpasOcean.kiteIndexOnCell = zeros(Int64, (nCells,maxEdges))

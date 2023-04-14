@@ -12,7 +12,7 @@ function calculate_normal_velocity_tendency!(mpasOcean::MPAS_Ocean)
 
 #             if cell1Index != 0 && cell2Index != 0
             @fastmath for k in 1:mpasOcean.maxLevelEdgeTop[iEdge]
-                mpasOcean.normalVelocityTendency[k,iEdge] = mpasOcean.gravity * ( mpasOcean.layerThickness[k,cell1Index] - mpasOcean.layerThickness[k,cell2Index] ) / mpasOcean.dcEdge[iEdge]
+                mpasOcean.normalVelocityTendency[k,iEdge] = mpasOcean.gravity * ( mpasOcean.sshCurrent[cell1Index] - mpasOcean.sshCurrent[cell2Index] ) / mpasOcean.dcEdge[iEdge]
             end
 #             end
 
@@ -45,13 +45,10 @@ function calculate_thickness_tendency!(mpasOcean::MPAS_Ocean)
             iCell2 = mpasOcean.cellsOnCell[i,iCell]
             
             @fastmath for k in 1:mpasOcean.maxLevelEdgeTop[iEdge]
-                mpasOcean.layerThicknessEdge[k,iEdge] = 0.5 * (mpasOcean.layerThickness[k,iCell] + mpasOcean.layerThickness[k,iCell2])
-
-                mpasOcean.layerThicknessTendency[k,iCell] += mpasOcean.edgeSignOnCell[iCell,i] * mpasOcean.layerThicknessEdge[k,iEdge] * mpasOcean.normalVelocityCurrent[k,iEdge] * mpasOcean.dvEdge[iEdge]
+                mpasOcean.layerThicknessTendency[k,iCell] += -mpasOcean.div_hu[k,iCell] - mpasOcean.vertAleTransportTop[k,iCell] + mpasOcean.vertAleTransportTop[k+1,iCell]
             end
-        end
-        # divide flux by area to get water rise
-        mpasOcean.layerThicknessTendency[:,iCell] ./= mpasOcean.areaCell[iCell]
+       end
+     
     end
 end
 
@@ -61,4 +58,16 @@ function update_thickness_by_tendency!(mpasOcean::MPAS_Ocean)
     mpasOcean.layerThickness .+= mpasOcean.dt .* mpasOcean.layerThicknessTendency
 end
 
+function calculate_vertical_mixing!(mpasOcean::MPAS_Ocean)
+    @fastmath for iEdge in 1:mpasOcean.nEdges
+        cell1 = mpasOcean.cellsOnEdge[1,iEdge]
+        cell2 = mpasOcean.cellsOnEdge[2,iEdge]
 
+       @fastmath for k in 1:mpasOcean.maxLevelEdgeTop[iEdge]
+           mpasOcean.layerThicknessEdge[k,iEdge] = 0.5 * (mpasOcean.layerThickness[k,iCell] + mpasOcean.layerThickness[k,iCell2])
+       end
+
+    
+ 
+    end
+end
