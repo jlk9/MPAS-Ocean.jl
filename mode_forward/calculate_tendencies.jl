@@ -39,16 +39,9 @@ end
 function calculate_thickness_tendency!(mpasOcean::MPAS_Ocean)
     mpasOcean.layerThicknessTendency .= 0.0
     @fastmath for iCell in 1:mpasOcean.nCells # Threads.@threads
-        # sum flux through each edge of cell
-        @fastmath for i in 1:mpasOcean.nEdgesOnCell[iCell]
-            iEdge = mpasOcean.edgesOnCell[i,iCell]
-            iCell2 = mpasOcean.cellsOnCell[i,iCell]
-            
-            @fastmath for k in 1:mpasOcean.maxLevelEdgeTop[iEdge]
+            @fastmath for k in 1:mpasOcean.maxLevelCell[iCell]
                 mpasOcean.layerThicknessTendency[k,iCell] += -mpasOcean.div_hu[k,iCell] - mpasOcean.vertAleTransportTop[k,iCell] + mpasOcean.vertAleTransportTop[k+1,iCell]
             end
-       end
-     
     end
 end
 
