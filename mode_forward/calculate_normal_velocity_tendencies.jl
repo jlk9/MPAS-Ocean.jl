@@ -12,7 +12,7 @@ function calculate_normal_velocity_tendency!(mpasOcean::MPAS_Ocean)
 
 #             if cell1Index != 0 && cell2Index != 0
             @fastmath for k in 1:mpasOcean.maxLevelEdgeTop[iEdge]
-                mpasOcean.normalVelocityTendency[k,iEdge] = mpasOcean.gravity * ( mpasOcean.sshCurrent[cell1Index] - mpasOcean.sshCurrent[cell2Index] ) / mpasOcean.dcEdge[iEdge]
+                mpasOcean.normalVelocityTendency[k,iEdge] = mpasOcean.gravity * ( mpasOcean.ssh[cell1Index] - mpasOcean.ssh[cell2Index] ) / mpasOcean.dcEdge[iEdge]
             end
 #             end
 
@@ -35,21 +35,6 @@ function update_normal_velocity_by_tendency!(mpasOcean::MPAS_Ocean)
     mpasOcean.normalVelocityCurrent .+= mpasOcean.dt .* mpasOcean.normalVelocityTendency
 end
 
-
-function calculate_thickness_tendency!(mpasOcean::MPAS_Ocean)
-    mpasOcean.layerThicknessTendency .= 0.0
-    @fastmath for iCell in 1:mpasOcean.nCells # Threads.@threads
-            @fastmath for k in 1:mpasOcean.maxLevelCell[iCell]
-                mpasOcean.layerThicknessTendency[k,iCell] += -mpasOcean.div_hu[k,iCell] - mpasOcean.vertAleTransportTop[k,iCell] + mpasOcean.vertAleTransportTop[k+1,iCell]
-            end
-    end
-end
-
-
-
-function update_thickness_by_tendency!(mpasOcean::MPAS_Ocean)
-    mpasOcean.layerThickness .+= mpasOcean.dt .* mpasOcean.layerThicknessTendency
-end
 
 function calculate_vertical_mixing!(mpasOcean::MPAS_Ocean)
     @fastmath for iEdge in 1:mpasOcean.nEdges

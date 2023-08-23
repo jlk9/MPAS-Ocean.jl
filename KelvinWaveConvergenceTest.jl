@@ -308,8 +308,8 @@ convergence_test("NonPeriodic_x",
             CODE_ROOT * "/ConvergenceStudyMeshes",
             "Coastal Kelvin Wave",
             kelvin_test, "CPU",
-            #resolutions=[32, 64, 144, 216, 324],
-            resolutions=[32],
+            resolutions=[32, 64, 144, 216, 324],
+            #resolutions=[32],
             format=(x->"$(x)x$(x)"),
             write_data=true, show_plots=true, nvlevels=5)
 

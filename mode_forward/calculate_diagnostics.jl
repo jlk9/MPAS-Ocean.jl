@@ -18,7 +18,7 @@ function calculate_vertical_ale_transport!(mpasOcean::MPAS_Ocean)
         end
 
         for k = 1:mpasOcean.maxLevelCell[iCell]
-            mpasOcean.ALE_thickness[k,iCell] = mpasOcean.restingThickness[k,iCell] + (mpasOcean.sshCurrent[iCell] * mpasOcean.vertCoordMovementWeights[k] * mpasOcean.restingThickness[k,iCell])/thicknessSum
+            mpasOcean.ALE_thickness[k,iCell] = mpasOcean.restingThickness[k,iCell] + (mpasOcean.ssh[iCell] * mpasOcean.vertCoordMovementWeights[k] * mpasOcean.restingThickness[k,iCell])/thicknessSum
         end
 
         mpasOcean.vertAleTransportTop[1,iCell] = 0.0
@@ -39,7 +39,7 @@ function calculate_ssh!(mpasOcean::MPAS_Ocean)
            totalThickness += mpasOcean.layerThickness[k,iCell]
         end
 
-        mpasOcean.sshCurrent[iCell] = totalThickness - mpasOcean.bottomDepth[iCell]
+        mpasOcean.ssh[iCell] = totalThickness - mpasOcean.bottomDepth[iCell]
 
     end
 

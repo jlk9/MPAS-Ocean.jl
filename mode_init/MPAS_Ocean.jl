@@ -50,7 +50,7 @@ mutable struct MPAS_Ocean
     restingThickness::Array{Float64,2}
     vertCoordMovementWeights::Array{Float64,1}         
     div_hu::Array{Float64,2}
-    sshCurrent::Array{Float64,1}    # sea surface height (cell-centered)
+    ssh::Array{Float64,1}    # sea surface height (cell-centered)
 
 
     ## edge-centered arrays
@@ -302,7 +302,7 @@ mutable struct MPAS_Ocean
 
         
         # ssh no longer prognostic, replaced with layerThickness
-        mpasOcean.sshCurrent = zeros(Float64, nCells)
+        mpasOcean.ssh= zeros(Float64, nCells)
 #         mpasOcean.sshTendency = zeros(Float64, nCells)
         
         mpasOcean.gravity = 9.8
