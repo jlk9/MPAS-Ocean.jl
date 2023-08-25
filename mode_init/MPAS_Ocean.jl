@@ -7,7 +7,7 @@ include("fixAngleEdge.jl")
 mutable struct MPAS_Ocean
 
     # prognostic variables
-    normalVelocityCurrent::Array{Float64,2}    # group velocity normal to mesh edges (edge-centered)
+    normalVelocity::Array{Float64,2}    # group velocity normal to mesh edges (edge-centered)
     normalVelocityTendency::Array{Float64,2}    # tendency (edge-centered)
 
     
@@ -297,7 +297,7 @@ mutable struct MPAS_Ocean
 
         ## defining the prognostic variables
 
-        mpasOcean.normalVelocityCurrent = zeros(Float64, (mpasOcean.nVertLevels, nEdges))
+        mpasOcean.normalVelocity = zeros(Float64, (mpasOcean.nVertLevels, nEdges))
         mpasOcean.normalVelocityTendency = zeros(Float64, (mpasOcean.nVertLevels, nEdges))
 
         

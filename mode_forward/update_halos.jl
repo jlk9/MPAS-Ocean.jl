@@ -18,7 +18,7 @@ function update_halos!(comm, mpasOcean, cellsFromMyChunk, cellsToMyChunk, edgesF
 	end
 	halobuffernv = [] # temporarily stores new halo normal velocity
 	for (srcchunk, localedges) in edgesFromMyChunk
-		newhalonv = Array{eltype(mpasOcean.normalVelocityCurrent)}(undef, mpasOcean.nVertLevels, length(localedges)) 
+		newhalonv = Array{eltype(mpasOcean.normalVelocity)}(undef, mpasOcean.nVertLevels, length(localedges)) 
 		append!(halobuffernv, [newhalonv])
 		reqnv = MPI.Irecv!(newhalonv, srcchunk-1, 1, comm) # tag 1 for norm vel
 		append!(recreqs, [reqnv])
@@ -35,7 +35,7 @@ function update_halos!(comm, mpasOcean, cellsFromMyChunk, cellsToMyChunk, edgesF
 		append!(sendreqs, [reqthick])
 	end
 	for (dstchunk, localedges) in edgesToMyChunk
-		reqnv = MPI.Isend(mpasOcean.normalVelocityCurrent[:,localedges], dstchunk-1, 1, comm)
+		reqnv = MPI.Isend(mpasOcean.normalVelocity[:,localedges], dstchunk-1, 1, comm)
 		append!(sendreqs, [reqnv])
 	end
 
@@ -47,6 +47,6 @@ function update_halos!(comm, mpasOcean, cellsFromMyChunk, cellsToMyChunk, edgesF
 		mpasOcean.layerThickness[:,localcells] = halobufferthick[i]
 	end
 	for (i, (srcchunk, localedges)) in enumerate(edgesFromMyChunk)
-		mpasOcean.normalVelocityCurrent[:,localedges] = halobuffernv[i]
+		mpasOcean.normalVelocity[:,localedges] = halobuffernv[i]
 	end
 end

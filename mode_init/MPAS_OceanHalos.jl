@@ -167,7 +167,7 @@ function sizeof_main_arrays(mpasOcean::MPAS_Ocean, cells, edges)
 
     mainEdgeArrayNames = [
         :normalVelocityTendency,
-        :normalVelocityCurrent,
+        :normalVelocity,
         :cellsOnEdge,
         :nEdgesOnEdge,
         :edgesOnEdge,
@@ -270,7 +270,7 @@ function mpas_subset(mpasOcean::MPAS_Ocean, cells, edges, vertices)
 		:weightsOnEdge,
     ]
     edge2djiFields = [
-        :normalVelocityCurrent,
+        :normalVelocity,
         :normalVelocityTendency,
 		:boundaryEdge,
 		:edgeMask,

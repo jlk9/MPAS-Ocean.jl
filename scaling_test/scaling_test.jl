@@ -106,14 +106,14 @@ function runtests(proccounts, fname, partitiondir; nsamples=6, nCellsX=64, halow
 
 		nvperlayer = kelvinWaveExactNormalVelocity(mpasOcean, collect(1:mpasOcean.nEdges), t) / mpasOcean.nVertLevels
 		for k in 1:mpasOcean.nVertLevels
-		    mpasOcean.normalVelocityCurrent[k,:] .= nvperlayer
+		    mpasOcean.normalVelocity[k,:] .= nvperlayer
 		end
 	end
 
 	function boundaryCondition!(mpasOcean, t)
 		for iEdge in 1:mpasOcean.nEdges
 		    if mpasOcean.boundaryEdge[iEdge] == 1.0
-			mpasOcean.normalVelocityCurrent[:,iEdge] .= kelvinWaveExactNormalVelocity(mpasOcean, iEdge, t)/mpasOcean.nVertLevels
+			mpasOcean.normalVelocity[:,iEdge] .= kelvinWaveExactNormalVelocity(mpasOcean, iEdge, t)/mpasOcean.nVertLevels
 		    end
 		end
 

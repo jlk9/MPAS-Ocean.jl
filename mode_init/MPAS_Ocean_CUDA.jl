@@ -31,7 +31,7 @@ mutable struct MPAS_Ocean_CUDA
 
 
     normalVelocityTendency::CUDA.CuArray{Float64,2}
-    normalVelocityCurrent::CUDA.CuArray{Float64,2}
+    normalVelocity::CUDA.CuArray{Float64,2}
     weightsOnEdge::CUDA.CuArray{Float64,2}
 
 

@@ -91,7 +91,7 @@ function stepAndSync()
 		append!(recreqs, [reqssh])
 
 		localedges = collect(Set(mpasOcean.edgesOnCell[:,localcells]))
-		newhalonv = Array{eltype(mpasOcean.normalVelocityCurrent)}(undef, length(localedges))
+		newhalonv = Array{eltype(mpasOcean.normalVelocity)}(undef, length(localedges))
 		append!(halobuffernv, [newhalonv])
 		reqnv = MPI.Irecv!(newhalonv, srcchunk-1, 1, comm) # tag 1 for norm vel
 		append!(recreqs, [reqnv])
@@ -106,7 +106,7 @@ function stepAndSync()
 
 		localedges = collect(Set(mpasOcean.edgesOnCell[:,localcells])) # Set to remove duplicates
 		order = sortperm(myEdges[localedges])
-		reqnv = MPI.Isend(mpasOcean.normalVelocityCurrent[localedges[order]], dstchunk-1, 1, comm)
+		reqnv = MPI.Isend(mpasOcean.normalVelocity[localedges[order]], dstchunk-1, 1, comm)
 		append!(sendreqs, [reqnv])
 	end
 
@@ -124,7 +124,7 @@ function stepAndSync()
 		mpasOcean.sshCurrent[localcells] = halobufferssh[i]
 		localedges = collect(Set(mpasOcean.edgesOnCell[:,localcells]))
 		order = sortperm(myEdges[localedges])
-		mpasOcean.normalVelocityCurrent[localedges[order]] = halobuffernv[i]
+		mpasOcean.normalVelocity[localedges[order]] = halobuffernv[i]
 	end
 end
 

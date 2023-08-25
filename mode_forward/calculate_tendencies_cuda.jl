@@ -6,7 +6,7 @@ function calculate_normal_velocity_tendency_cuda!(mpasOcean::MPAS_Ocean_CUDA)
     CUDA.@cuda blocks=cld(mpasOcean.nEdges, 1024) threads=1024 maxregs=64 calculate_normal_velocity_tendency_cuda_kernel!(
                                                                         mpasOcean.nEdges,
                                                                         mpasOcean.normalVelocityTendency,
-                                                                        mpasOcean.normalVelocityCurrent,
+                                                                        mpasOcean.normalVelocity,
                                                                         mpasOcean.layerThickness,
                                                                         mpasOean.maxLevelEdgeTop,
                                                                         mpasOcean.cellsOnEdge,
@@ -66,19 +66,19 @@ end
 function update_normal_velocity_by_tendency_cuda!(mpasOcean::MPAS_Ocean_CUDA)
     CUDA.@cuda blocks=cld(mpasOcean.nEdges, 1024) threads=1024 maxregs=64 update_normal_velocity_by_tendency_cuda_kernel!(
                                                                         mpasOcean.nEdges,
-                                                                        mpasOcean.normalVelocityCurrent,
+                                                                        mpasOcean.normalVelocity,
                                                                         mpasOcean.dt,
                                                                         mpasOcean.normalVelocityTendency)
 end
 
 function update_normal_velocity_by_tendency_cuda_kernel!(nEdges,
-                                                         normalVelocityCurrent,
+                                                         normalVelocity,
                                                          dt,
                                                          normalVelocityTendency)
     iEdge = (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
     if iEdge <= nEdges
 
-        normalVelocityCurrent[:,iEdge] += dt * normalVelocityTendency[:,iEdge]
+        normalVelocity[:,iEdge] += dt * normalVelocityTendency[:,iEdge]
 
     end
     return
@@ -96,7 +96,7 @@ function calculate_thickness_tendency_cuda!(mpasOcean::MPAS_Ocean_CUDA)
                                                                         mpasOcean.nCells,
                                                                         mpasOcean.layerThicknessTendency,
                                                                         mpasOcean.layerThickness,
-                                                                        mpasOcean.normalVelocityCurrent,
+                                                                        mpasOcean.normalVelocity,
                                                                         mpasOcean.maxLevelEdgeTop,
                                                                         mpasOcean.nEdgesOnCell,
                                                                         mpasOcean.edgesOnCell,

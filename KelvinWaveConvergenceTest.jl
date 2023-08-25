@@ -25,8 +25,8 @@ using DelimitedFiles
 function boundaryCondition2!(mpasOcean, t)
     for iEdge in 1:mpasOcean.nEdges
         if mpasOcean.boundaryEdge[iEdge] == 1
-#             mpasOcean.normalVelocityCurrent[iEdge,:] .= 0
-            mpasOcean.normalVelocityCurrent[:,iEdge] .=  -kelvinWaveExactNormalVelocity(mpasOcean, iEdge, t)/mpasOcean.nVertLevels# * 5
+#             mpasOcean.normalVelocity[iEdge,:] .= 0
+            mpasOcean.normalVelocity[:,iEdge] .=  -kelvinWaveExactNormalVelocity(mpasOcean, iEdge, t)/mpasOcean.nVertLevels# * 5
         end
     end
 

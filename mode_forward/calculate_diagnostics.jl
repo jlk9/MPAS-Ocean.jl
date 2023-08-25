@@ -144,7 +144,7 @@ function calculate_div_hu!(mpasOcean::MPAS_Ocean)
             iEdge =  mpasOcean.edgesOnCell[i,iCell]
 
             for k = 1:mpasOcean.maxLevelCell[iCell]
-                mpasOcean.div_hu[k,iCell] -= mpasOcean.edgeSignOnCell[iCell,i] * mpasOcean.layerThicknessEdge[k,iEdge] * mpasOcean.normalVelocityCurrent[k,iEdge] * mpasOcean.dvEdge[iEdge] / mpasOcean.areaCell[iCell]
+                mpasOcean.div_hu[k,iCell] -= mpasOcean.edgeSignOnCell[iCell,i] * mpasOcean.layerThicknessEdge[k,iEdge] * mpasOcean.normalVelocity[k,iEdge] * mpasOcean.dvEdge[iEdge] / mpasOcean.areaCell[iCell]
             end
         end
     end

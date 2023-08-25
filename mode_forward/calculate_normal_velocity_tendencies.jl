@@ -22,7 +22,7 @@ function calculate_normal_velocity_tendency!(mpasOcean::MPAS_Ocean)
 
                 if eoe != 0
                     @fastmath for k in 1:mpasOcean.maxLevelEdgeTop[iEdge]
-                        mpasOcean.normalVelocityTendency[k,iEdge] += mpasOcean.weightsOnEdge[i,iEdge] * mpasOcean.normalVelocityCurrent[k,eoe] * mpasOcean.fEdge[eoe]
+                        mpasOcean.normalVelocityTendency[k,iEdge] += mpasOcean.weightsOnEdge[i,iEdge] * mpasOcean.normalVelocity[k,eoe] * mpasOcean.fEdge[eoe]
 #                         mpasOcean.normalVelocityTendency[k,iEdge] *= mpasOcean.edgeMask[iEdge,k]
                     end
                 end
@@ -32,7 +32,7 @@ function calculate_normal_velocity_tendency!(mpasOcean::MPAS_Ocean)
 end
 
 function update_normal_velocity_by_tendency!(mpasOcean::MPAS_Ocean)
-    mpasOcean.normalVelocityCurrent .+= mpasOcean.dt .* mpasOcean.normalVelocityTendency
+    mpasOcean.normalVelocity .+= mpasOcean.dt .* mpasOcean.normalVelocityTendency
 end
 
 
