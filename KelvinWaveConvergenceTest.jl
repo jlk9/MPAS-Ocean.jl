@@ -37,54 +37,10 @@ function lateralProfilePeriodic(y)
     return 1e-6*cos.(y/mpasOcean.lX * 4 * pi)
 end
 
-function fix_angleedge2!(mpasOcean)
-    for iEdge in 1:mpasOcean.nEdges
-        if mpasOcean.boundaryEdge[iEdge] == 1
-            thisXEdge = mpasOcean.xEdge[iEdge]
-            thisYEdge = mpasOcean.yEdge[iEdge]
-            cell1 = mpasOcean.cellsOnEdge[1,iEdge]
-            cell2 = mpasOcean.cellsOnEdge[2,iEdge]
-
-            xCell1 = mpasOcean.xCell[cell1]
-            yCell1 = mpasOcean.yCell[cell1]
-
-
-                if thisXEdge > xCell1 && abs(thisYEdge - yCell1) < tolerance
-                    DeltaX = dcEdge
-                    DeltaY = 0.0
-                elseif thisXEdge > xCell1 && thisYEdge > yCell1
-                    DeltaX = dcEdge/2.0
-                    DeltaY = sqrt3over2*dcEdge
-                elseif thisXEdge > xCell1 && thisYEdge < yCell1
-                    DeltaX = dcEdge/2.0
-                    DeltaY = -sqrt3over2*dcEdge
-                elseif thisXEdge < xCell1 && abs(thisYEdge - yCell1) < tolerance
-                    DeltaX = -dcEdge
-                    DeltaY = 0.0
-                elseif thisXEdge < xCell1 && thisYEdge > yCell1
-                    DeltaX = -dcEdge/2.0
-                    DeltaY = sqrt3over2*dcEdge
-                elseif thisXEdge < xCell1 && thisYEdge < yCell1
-                    DeltaX = -dcEdge/2.0
-                    DeltaY = -sqrt3over2*dcEdge
-                end
-            
-            whichedge = findall(mpasOcean.edgesOnCell[:,cell1] .== iEdge)[1]
-            
-            mpasOcean.angleEdge[iEdge] = returnTanInverseInProperQuadrant(DeltaX,DeltaY) * mpasOcean.edgeSignOnCell[cell1, whichedge]
-            if mpasOcean.angleEdge[iEdge] < 0
-                mpasOcean.angleEdge[iEdge]  += 2*pi
-            end
-            
-        end
-    end
-end
-
 function kelvin_test(mesh_directory, base_mesh_file_name, mesh_file_name, periodicity, T, dt, nSaves=1;
         plot=false, animate=false, nvlevels=1)
     mpasOcean = MPAS_Ocean(mesh_directory,base_mesh_file_name,mesh_file_name, periodicity=periodicity, nvlevels=nvlevels)
 #     fix_angleedge2!(mpasOcean)
-#     fixAngleEdge2!(mpasOcean)
     
     meanCoriolisParameterf = sum(mpasOcean.fEdge) / length(mpasOcean.fEdge)
     meanFluidThicknessH = sum(mpasOcean.bottomDepth)/length(mpasOcean.bottomDepth)
