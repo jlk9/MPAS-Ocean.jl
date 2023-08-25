@@ -108,56 +108,35 @@ function kelvin_test(mesh_directory, base_mesh_file_name, mesh_file_name, period
     println("setting up initial condition")
     kelvinWaveExactSolution!(mpasOcean)
     
-    sshOverTimeNumerical = zeros(Float64, (mpasOcean.nCells, nSaves))
-    sshOverTimeExact = zeros(Float64, (mpasOcean.nCells, nSaves))
-    nvOverTimeNumerical = zeros(Float64, (mpasOcean.nEdges, nSaves))
-    nvOverTimeExact = zeros(Float64, (mpasOcean.nEdges, nSaves))
+    sshExact = zeros(Float64, (mpasOcean.nCells))
     
-    sshOverTimeNumerical[:,1] = dropdims(sum(mpasOcean.layerThickness, dims=1), dims=1) - mpasOcean.bottomDepth
-    sshOverTimeExact[:,1] = kelvinWaveExactSSH(mpasOcean, 1:mpasOcean.nCells)
-    nvOverTimeNumerical[:,1] = sum(mpasOcean.normalVelocityCurrent, dims=1)
-    nvOverTimeExact[:,1] = kelvinWaveExactNormalVelocity(mpasOcean, 1:mpasOcean.nEdges)
-
-
     fpath = CODE_ROOT * "output/simulation_convergence/coastal_kelvinwave/$periodicity/CPU/timehorizon_$(T)"
     
-    function plotSSHs(frame, desc="", fpath='.')
+    function plotSSHs(frame, t, desc="", fpath='.')
         fig, axs = plt.subplots(1, 3, figsize=(9,3))
+
+        sshExact = kelvinWaveExactSSH(mpasOcean, 1:mpasOcean.nCells, t)
         
-        fig, ax = heatMapMesh(mpasOcean, sshOverTimeNumerical[:,frame], fig=fig, ax=axs[1])
+        fig, ax = heatMapMesh(mpasOcean, mpasOcean.ssh, fig=fig, ax=axs[1])
         ax.set_title("Numerical Solution")
 
-        fig, ax = heatMapMesh(mpasOcean, sshOverTimeExact[:,frame], fig=fig, ax=axs[2])
+        fig, ax = heatMapMesh(mpasOcean, sshExact, fig=fig, ax=axs[2])
         ax.set_title("Exact Solution")
         
-        fig, ax = heatMapMesh(mpasOcean, sshOverTimeExact[:,frame] - sshOverTimeNumerical[:,frame], fig=fig, ax=axs[3])#, cMin=-0.005, cMax=0.005)
+        fig, ax = heatMapMesh(mpasOcean, sshExact -  mpasOcean.ssh, fig=fig, ax=axs[3])#, cMin=-0.005, cMax=0.005)
         ax.set_title("Difference")
         
         fig.suptitle("Coastal Kelvin Wave SSH, $desc")
         
         fig.savefig("$(fpath)/ssh_cell_$(frame).png", bbox_inches="tight")
         
-        fig, axs = plt.subplots(1, 3, figsize=(9,3))
-        
-        fig, ax = edgeHeatMapMesh(mpasOcean, nvOverTimeNumerical[:,frame], fig=fig, ax=axs[1])
-        ax.set_title("Numerical Solution")
-
-        fig, ax = edgeHeatMapMesh(mpasOcean, nvOverTimeExact[:,frame], fig=fig, ax=axs[2])
-        ax.set_title("Exact Solution")
-        
-        fig, ax = edgeHeatMapMesh(mpasOcean, nvOverTimeExact[:,frame] - nvOverTimeNumerical[:,frame], fig=fig, ax=axs[3])#, cMin=-0.005, cMax=0.005)
-        ax.set_title("Difference")
-        
-        fig.suptitle("Coastal Kelvin Wave NV, $desc")
-        
-        fig.savefig("$(fpath)/ssh_edge_$(frame).png", bbox_inches="tight")
-        
         return fig
     end
     
     if plot
         
-        plotSSHs(1, "Initial Condition", fpath)
+        calculate_diagnostics!(mpasOcean)
+        plotSSHs(1, 0.0, "Initial Condition", fpath)
         
     end
     
@@ -173,43 +152,28 @@ function kelvin_test(mesh_directory, base_mesh_file_name, mesh_file_name, period
     t = 0
     for i in 1:nSaves
         for j in 1:nSteps
-            
              
+            t += mpasOcean.dt
+
             calculate_diagnostics!(mpasOcean)
             calculate_normal_velocity_tendency!(mpasOcean)
             update_normal_velocity_by_tendency!(mpasOcean)
-
-            
-            t += mpasOcean.dt
             
 #             boundaryCondition2!(mpasOcean, t)
+
             calculate_diagnostics!(mpasOcean)
             calculate_thickness_tendency!(mpasOcean)
             update_thickness_by_tendency!(mpasOcean)
-            
+
         end
         println("t: $t")
-        sshOverTimeNumerical[:,i] = dropdims(sum(mpasOcean.layerThickness, dims=1),dims=1) - mpasOcean.bottomDepth
-        nvOverTimeNumerical[:,i] = sum(mpasOcean.normalVelocityCurrent, dims=1)
-        sshOverTimeExact[:,i] .= kelvinWaveExactSSH(mpasOcean, 1:mpasOcean.nCells, t)
-        nvOverTimeExact[:,i] .= kelvinWaveExactNormalVelocity(mpasOcean, 1:mpasOcean.nEdges, t)
-    end
-    
-    
-    
-    if plot
-        
-        plotSSHs(nSaves, "T = $(t)", fpath)
-        
-        if nSaves > 1 && animate
-            for frame in 1:nSaves
-                plotSSHs(frame, "T = $(frame*nSteps*mpasOcean.dt)")
-            end
-            
+        if plot
+            plotSSHs(i+1, t, "T = $(t)", fpath)
         end
     end
-    
-    error = sshOverTimeNumerical .- sshOverTimeExact
+
+    sshExact = kelvinWaveExactSSH(mpasOcean, 1:mpasOcean.nCells, t) 
+    error = mpasOcean.ssh .- sshExact
     MaxErrorNorm = norm(error, Inf)
     L2ErrorNorm = norm(error/sqrt(float(mpasOcean.nCells)))
     
@@ -268,7 +232,8 @@ function convergence_test(periodicity, mesh_directory, operator_name, test, devi
     mpasOcean = MPAS_Ocean(mesh_directory,base_mesh_file_name,mesh_file_name, periodicity=periodicity, nvlevels=nvlevels)
     
     maxdt = mpasOcean.dt
-    T = 32*maxdt
+    #T = 32*maxdt
+    T = 15000
     
     for iCase = 1:nCases
         if periodicity == "Periodic"
