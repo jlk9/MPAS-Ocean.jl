@@ -78,6 +78,21 @@ function calculate_ssh!(mpasOcean::MPAS_Ocean)
 
 end
 
+function calculate_ssh_new!(mpasOcean::MPAS_Ocean)
+
+    for iCell in 1:mpasOcean.nCells
+
+        totalThickness = 0.0
+        for k = 1:mpasOcean.maxLevelCell[iCell]
+           totalThickness += mpasOcean.layerThicknessNew[k,iCell]
+        end
+
+        mpasOcean.ssh[iCell] = totalThickness - mpasOcean.bottomDepth[iCell]
+
+    end
+
+end
+
 function calculate_layer_thickness_edge!(mpasOcean::MPAS_Ocean)
 
     for iEdge in 1:mpasOcean.nEdges

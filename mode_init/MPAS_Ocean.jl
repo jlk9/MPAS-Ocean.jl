@@ -8,10 +8,14 @@ mutable struct MPAS_Ocean
 
     # prognostic variables
     normalVelocity::Array{Float64,2}    # group velocity normal to mesh edges (edge-centered)
+    normalVelocityOld::Array{Float64,2}
+    normalVelocityNew::Array{Float64,2}
     normalVelocityTendency::Array{Float64,2}    # tendency (edge-centered)
 
     
     layerThickness::Array{Float64,2}
+    layerThicknessOld::Array{Float64,2}
+    layerThicknessNew::Array{Float64,2}
     layerThicknessTendency::Array{Float64,2}
     layerThicknessEdge::Array{Float64,2}
     
@@ -240,6 +244,8 @@ mutable struct MPAS_Ocean
         mpasOcean.bottomDepth = zeros(Float64, nCells)
         mpasOcean.bottomDepthEdge = zeros(Float64, nEdges)
 
+        mpasOcean.layerThicknessOld = zeros(Float64, (mpasOcean.nVertLevels, nCells))
+        mpasOcean.layerThicknessNew = zeros(Float64, (mpasOcean.nVertLevels, nCells))
         mpasOcean.layerThickness = zeros(Float64, (mpasOcean.nVertLevels, nCells))
         mpasOcean.layerThicknessTendency = zeros(Float64, (mpasOcean.nVertLevels, nCells))
         mpasOcean.layerThicknessEdge = zeros(Float64, (mpasOcean.nVertLevels, nEdges))
@@ -270,7 +276,7 @@ mutable struct MPAS_Ocean
             mpasOcean.restingThickness[k,:] .= mpasOcean.bottomDepth[:] ./ mpasOcean.nVertLevels
         end
         mpasOcean.vertCoordMovementWeights[:] .= 1.0
-        
+        mpasOcean.layerThicknessOld = copy(mpasOcean.layerThickness)
         
         mpasOcean.kiteIndexOnCell = zeros(Int64, (nCells,maxEdges))
         mpasOcean.edgeSignOnVertex = zeros(Int8, (nVertices,maxEdges))
@@ -297,6 +303,8 @@ mutable struct MPAS_Ocean
 
         ## defining the prognostic variables
 
+        mpasOcean.normalVelocityOld = zeros(Float64, (mpasOcean.nVertLevels, nEdges))
+        mpasOcean.normalVelocityNew = zeros(Float64, (mpasOcean.nVertLevels, nEdges))
         mpasOcean.normalVelocity = zeros(Float64, (mpasOcean.nVertLevels, nEdges))
         mpasOcean.normalVelocityTendency = zeros(Float64, (mpasOcean.nVertLevels, nEdges))
 

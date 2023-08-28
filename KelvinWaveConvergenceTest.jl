@@ -6,8 +6,8 @@
 CODE_ROOT = pwd() * "/"
 
 
-include(CODE_ROOT * "mode_forward/time_steppers.jl")
 include(CODE_ROOT * "mode_init/MPAS_Ocean.jl")
+include(CODE_ROOT * "mode_forward/time_steppers.jl")
 include(CODE_ROOT * "visualization.jl")
 include(CODE_ROOT * "mode_init/exactsolutions.jl")
 
@@ -63,6 +63,10 @@ function kelvin_test(mesh_directory, base_mesh_file_name, mesh_file_name, period
     
     println("setting up initial condition")
     kelvinWaveExactSolution!(mpasOcean)
+    mpasOcean.layerThicknessOld = copy(mpasOcean.layerThickness)
+    mpasOcean.normalVelocityOld = copy(mpasOcean.normalVelocity)
+    mpasOcean.layerThicknessNew = copy(mpasOcean.layerThickness)
+    mpasOcean.normalVelocityNew = copy(mpasOcean.normalVelocity)
     
     sshExact = zeros(Float64, (mpasOcean.nCells))
     
@@ -91,7 +95,7 @@ function kelvin_test(mesh_directory, base_mesh_file_name, mesh_file_name, period
     
     if plot
         
-        calculate_diagnostics!(mpasOcean)
+        calculate_ssh_new!(mpasOcean)
         plotSSHs(1, 0.0, "Initial Condition", fpath)
         
     end
@@ -111,19 +115,23 @@ function kelvin_test(mesh_directory, base_mesh_file_name, mesh_file_name, period
              
             t += mpasOcean.dt
 
-            calculate_diagnostics!(mpasOcean)
-            calculate_normal_velocity_tendency!(mpasOcean)
-            update_normal_velocity_by_tendency!(mpasOcean)
-            
-#             boundaryCondition2!(mpasOcean, t)
+            #calculate_diagnostics!(mpasOcean)
+            #calculate_normal_velocity_tendency!(mpasOcean)
+            #update_normal_velocity_by_tendency!(mpasOcean)
+            #
+            ## boundaryCondition2!(mpasOcean, t)
 
-            calculate_diagnostics!(mpasOcean)
-            calculate_thickness_tendency!(mpasOcean)
-            update_thickness_by_tendency!(mpasOcean)
+            #calculate_diagnostics!(mpasOcean)
+            #calculate_thickness_tendency!(mpasOcean)
+            #update_thickness_by_tendency!(mpasOcean)
+
+            forward_rk4!(mpasOcean)
+            #forward_backward_step!(mpasOcean)
 
         end
         println("t: $t")
         if plot
+            calculate_ssh_new!(mpasOcean)
             plotSSHs(i+1, t, "T = $(t)", fpath)
         end
     end
@@ -232,5 +240,5 @@ convergence_test("NonPeriodic_x",
             resolutions=[32, 64, 144, 216, 324],
             #resolutions=[32],
             format=(x->"$(x)x$(x)"),
-            write_data=true, show_plots=true, nvlevels=5)
+            write_data=true, show_plots=true, nvlevels=1)
 
