@@ -1,9 +1,13 @@
-function kelvinWaveGenerator(mpasOcean, lateralProfile)
+function kelvinWaveGenerator(mpasOcean)
     meanCoriolisParameterf = sum(mpasOcean.fEdge) / length(mpasOcean.fEdge)
     meanFluidThicknessH = sum(mpasOcean.bottomDepth) / length(mpasOcean.bottomDepth)
     c = sqrt(mpasOcean.gravity*meanFluidThicknessH)
     rossbyRadiusR = c/meanCoriolisParameterf
 
+    function lateralProfile(y)
+        return 1e-6*cos(y/mpasOcean.lY * 4 * pi) 
+    end 
+    
     function kelvinWaveExactNormalVelocity(mpasOcean, iEdge, t=0)
         v = c * lateralProfile.(mpasOcean.yEdge[iEdge] .+ c*t) .* exp.(-mpasOcean.xEdge[iEdge]/rossbyRadiusR)
         return v .* sin.(mpasOcean.angleEdge[iEdge])
@@ -30,6 +34,7 @@ function kelvinWaveGenerator(mpasOcean, lateralProfile)
         for iEdge in 1:mpasOcean.nEdges
             if mpasOcean.boundaryEdge[iEdge] == 1.0
                 mpasOcean.normalVelocity[:,iEdge] .= kelvinWaveExactNormalVelocity(mpasOcean, iEdge, t)/mpasOcean.nVertLevels
+                #mpasOcean.normalVelocity[:,iEdge] .= -kelvinWaveExactNormalVelocity(mpasOcean, iEdge, t)/mpasOcean.nVertLevels
             end
         end
 
@@ -39,60 +44,45 @@ function kelvinWaveGenerator(mpasOcean, lateralProfile)
 end
 
 
-
-function inertiaGravityWaveParams(mpasOcean, nX, nY, etaHat)
+function inertiaGravityWaveGenerator(mpasOcean, etaHat=1e0)
     f0 = sum(mpasOcean.fEdge) / length(mpasOcean.fEdge)
-    
     meanFluidThickness = sum(mpasOcean.bottomDepth)/length(mpasOcean.bottomDepth)
-    
-    kX = nX * 2*pi / mpasOcean.lX
-
-    kY = nY * 2*pi / mpasOcean.lY
-
+    kX = 2.0 * 2.0*pi / mpasOcean.lX
+    kY = 2.0 * 2.0*pi / mpasOcean.lY
     omega = sqrt(f0^2 + mpasOcean.gravity*meanFluidThickness*(kX^2 + kY^2))
+    g = mpasOcean.gravity
 
-    return etaHat, f0, kX, kY, omega
-end
-function inertiaGravityExactSolution!(mpasOcean::MPAS_Ocean, etaHat::Float64, f0::Float64, kX::Float64, kY::Float64, omega::Float64, t::Float64)
-    for iCell in 1:mpasOcean.nCells
-        x = mpasOcean.xCell[iCell]
-        y = mpasOcean.yCell[iCell]
-        
-        mpasOcean.layerThickness[:,iCell] .+= DetermineInertiaGravityWaveExactSurfaceElevation(etaHat,kX,kY,omega,x,y,t) / mpasOcean.nVertLevels
+    function inertiaGravityExactNormalVelocity(mpasOcean, iEdge, t=0)
+    
+        u = etaHat*(g/(omega^2.0 - f0^2.0)*(omega*kX*cos.(kX*mpasOcean.xEdge[iEdge] .+ kY*mpasOcean.yEdge[iEdge] - omega*t)
+                                              .- f0*kY*sin.(kX*mpasOcean.xEdge[iEdge] .+ kY*mpasOcean.yEdge[iEdge] - omega*t)))
+
+        v = etaHat*(g/(omega^2.0 - f0^2.0)*(omega*kY*cos.(kX*mpasOcean.xEdge[iEdge] .+ kY*mpasOcean.yEdge[iEdge] - omega*t)
+                                              .+ f0*kX*sin.(kX*mpasOcean.xEdge[iEdge] .+ kY*mpasOcean.yEdge[iEdge] - omega*t)))
+    
+        theta = mpasOcean.angleEdge[iEdge]
+
+        return u*cos(theta) + v*sin(theta)
+    end
+
+    function inertiaGravityWaveExactSSH(mpasOcean, iCell, t=0)
+        eta = etaHat*cos.(kX*mpasOcean.xCell[iCell] .+ kY*mpasOcean.yCell[iCell] .- omega*t)
+        return eta
     end
     
-    for iEdge in 1:mpasOcean.nEdges
-        x = mpasOcean.xEdge[iEdge]
-        y = mpasOcean.yEdge[iEdge]
+    function inertiaGravityExactSolution!(mpasOcean, t=0)
+        for iCell in 1:mpasOcean.nCells
+            
+            mpasOcean.layerThickness[:,iCell] .+= inertiaGravityWaveExactSSH(mpasOcean, iCell, t) / mpasOcean.nVertLevels
+        end
         
-        u = DetermineInertiaGravityWaveExactZonalVelocity(etaHat, f0, mpasOcean.gravity, kX, kY, omega, x, y, t)
-        
-        v = DetermineInertiaGravityWaveExactMeridionalVelocity(etaHat, f0, mpasOcean.gravity, kX, kY, omega, x, y, t)
-        
-        theta = mpasOcean.angleEdge[iEdge]
-        
-        mpasOcean.normalVelocity[:,iEdge] .= ( u*cos(theta) + v*sin(theta) ) / mpasOcean.nVertLevels
+        for iEdge in 1:mpasOcean.nEdges
+           
+            nv = inertiaGravityExactNormalVelocity(mpasOcean, iEdge, t) 
+            
+            mpasOcean.normalVelocity[:,iEdge] .= nv / mpasOcean.nVertLevels
+        end
     end
-end
-function inertiaGravityExactNormalVelocity(theta, etaHat,f0,g,kX,kY,omega,x,y,t)
 
-    u = DetermineInertiaGravityWaveExactZonalVelocity(etaHat, f0, g, kX, kY, omega, x, y, t)
-
-    v = DetermineInertiaGravityWaveExactMeridionalVelocity(etaHat, f0, g, kX, kY, omega, x, y, t)
-
-    return u*cos(theta) + v*sin(theta)
-end
-function DetermineInertiaGravityWaveExactMeridionalVelocity(etaHat,f0,g,kX,kY,omega,x,y,time)
-    v = etaHat*(g/(omega^2.0 - f0^2.0)*(omega*kY*cos(kX*x + kY*y - omega*time)
-                                          + f0*kX*sin(kX*x + kY*y - omega*time)))
-    return v
-end
-function DetermineInertiaGravityWaveExactZonalVelocity(etaHat,f0,g,kX,kY,omega,x,y,time)
-    u = etaHat*(g/(omega^2.0 - f0^2.0)*(omega*kX*cos(kX*x + kY*y - omega*time)
-                                          - f0*kY*sin(kX*x + kY*y - omega*time)))
-    return u
-end
-function DetermineInertiaGravityWaveExactSurfaceElevation(etaHat,kX,kY,omega,x,y,time)
-    eta = etaHat*cos(kX*x + kY*y - omega*time)
-    return eta
+    return inertiaGravityExactNormalVelocity, inertiaGravityWaveExactSSH, inertiaGravityExactSolution!
 end

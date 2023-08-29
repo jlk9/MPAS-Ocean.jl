@@ -1,6 +1,7 @@
 include("calculate_thickness_tendencies.jl")
 include("calculate_normal_velocity_tendencies.jl")
 include("calculate_diagnostics.jl")
+include("../mode_init/exactsolutions.jl")
 
 function forward_backward_step!(mpasOcean::MPAS_Ocean)
     calculate_diagnostics!(mpasOcean)
@@ -25,7 +26,7 @@ function forward_euler_step!(mpasOcean::MPAS_Ocean)
     update_thickness_by_tendency!(mpasOcean)
 end
 
-function forward_rk4!(mpasOcean::MPAS_Ocean)
+function forward_rk4!(mpasOcean::MPAS_Ocean,  t)
 
     a = [0.0, 0.5, 0.5, 1.0].*mpasOcean.dt
     b = [1.0/6.0, 1.0/3.0, 1.0/3.0, 1.0/6.0].*mpasOcean.dt
@@ -34,6 +35,8 @@ function forward_rk4!(mpasOcean::MPAS_Ocean)
 
         mpasOcean.layerThickness .= mpasOcean.layerThicknessOld .+ a[rkStage].*mpasOcean.layerThicknessTendency
         mpasOcean.normalVelocity .= mpasOcean.normalVelocityOld .+ a[rkStage].*mpasOcean.normalVelocityTendency
+
+        tstage = t + a[rkStage]
 
         calculate_diagnostics!(mpasOcean)
         calculate_normal_velocity_tendency!(mpasOcean)
