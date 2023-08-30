@@ -6,6 +6,55 @@ using PyPlot
 mplpatches      = pyimport("matplotlib.patches")
 mplcollections  = pyimport("matplotlib.collections")
 
+function convergenceplot(nCellsX, errorNorm, normtype, T, decimals, output_path)
+    A = [log10.(nCellsX)    ones(length(nCellsX))]
+    m, c = A \ log10.(errorNorm)
+    y = m*log10.(nCellsX) .+ c
+    y = 10 .^ y
+
+    slopestr ="$(round(m,digits=decimals))"
+    while length(split(slopestr, ".")[end]) < decimals
+        slopestr *= "0"
+    end
+
+    fig, ax = subplots(1,1, figsize=(9,9))
+    tight_layout()
+    ax.loglog(nCellsX, errorNorm, label="$normtype Error Norm", marker="s", linestyle="None", color="black")
+    ax.loglog(nCellsX, y, label="Best Fit Line, slope=$slopestr", color="black")
+    ax.set_title(wrap_regex("Convergence of $normtype Error Norm, Time Horizon = $(T) s", 50), fontsize=22, fontweight="bold")
+    ax.legend(loc="upper right", fontsize=20)
+    ax.set_xlabel("Number of cells", fontsize=20)
+    ax.set_ylabel("$normtype error norm", fontsize=20)
+    ax.grid(which="both")
+    fname = "$output_path$(Dates.now())_$(normtype)"
+    fig.savefig("$(fname)_convergence.png", bbox_inches="tight")
+
+    return fig, ax
+end
+
+function plotSSHs(frame, mpasOcean, sshExact, desc="", output_path='.')
+    fig, axs = plt.subplots(1, 3, figsize=(9,3))
+
+    fig, ax = heatMapMesh(mpasOcean, mpasOcean.ssh, fig=fig, ax=axs[1])
+    ax.set_title("Numerical Solution")
+
+    fig, ax = heatMapMesh(mpasOcean, sshExact, fig=fig, ax=axs[2])
+    ax.set_title("Exact Solution")
+
+    fig, ax = heatMapMesh(mpasOcean, sshExact -  mpasOcean.ssh, fig=fig, ax=axs[3])#, cMin=-0.005, cMax=0.005)
+    ax.set_title("Difference")
+
+    fig.suptitle("SSH, $desc")
+
+    fig.savefig("$(output_path)/ssh_cell_$(frame).png", bbox_inches="tight")
+
+    return fig
+end
+
+function wrap_regex(str::AbstractString, maxlen = 92)
+    replace(str, Regex(".{1,$maxlen}( |\$)") => @s_str "\\0\n")
+end
+
 function heatMapMesh(mpasOcean, phi; fig="new", ax="new", cbar="new", cmap="seismic", cMin="auto", cMax="auto")
     if fig == "new"
         fig = figure()

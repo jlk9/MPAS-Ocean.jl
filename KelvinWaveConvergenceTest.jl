@@ -22,7 +22,7 @@ using DelimitedFiles
 
 
 
-function model_run(mesh_directory, mesh_file_name, periodicity, T, output_path, nSaves=1;
+function model_run(test_case, mesh_directory, mesh_file_name, periodicity, T, output_path, nSaves=1;
         plot=false, animate=false, nvlevels=1)
 
     mpasOcean = MPAS_Ocean(mesh_directory, mesh_file_name, periodicity=periodicity, nvlevels=nvlevels)
@@ -35,8 +35,11 @@ function model_run(mesh_directory, mesh_file_name, periodicity, T, output_path, 
     lYedge = maximum(mpasOcean.yEdge) - minimum(mpasOcean.yEdge)
 
     println("generating exact methods for mesh")
-    exactNormalVelocity, exactSSH, exactSolution!, boundaryCondition! = kelvinWaveGenerator(mpasOcean)
-    #exactNormalVelocity, exactSSH, exactSolution! = inertiaGravityWaveGenerator(mpasOcean)
+    if test_case == "kelvinWave"
+        exactNormalVelocity, exactSSH, exactSolution!, boundaryCondition! = kelvinWaveGenerator(mpasOcean)
+    elseif test_case == "inertiaGravityWave"
+        exactNormalVelocity, exactSSH, exactSolution! = inertiaGravityWaveGenerator(mpasOcean)
+    end
     
     println("setting up initial condition")
     exactSolution!(mpasOcean)
@@ -85,54 +88,6 @@ function model_run(mesh_directory, mesh_file_name, periodicity, T, output_path, 
     return mpasOcean.nCells, mpasOcean.dt, MaxErrorNorm, L2ErrorNorm
 end
 
-function wrap_regex(str::AbstractString, maxlen = 92)
-    replace(str, Regex(".{1,$maxlen}( |\$)") => @s_str "\\0\n")
-end
-
-function convergenceplot(nCellsX, errorNorm, normtype, T, decimals, output_path)
-    A = [log10.(nCellsX)    ones(length(nCellsX))]
-    m, c = A \ log10.(errorNorm)
-    y = m*log10.(nCellsX) .+ c
-    y = 10 .^ y
-    
-    slopestr ="$(round(m,digits=decimals))"
-    while length(split(slopestr, ".")[end]) < decimals
-        slopestr *= "0"
-    end
-
-    fig, ax = subplots(1,1, figsize=(9,9))
-    tight_layout()
-    ax.loglog(nCellsX, errorNorm, label="$normtype Error Norm", marker="s", linestyle="None", color="black")
-    ax.loglog(nCellsX, y, label="Best Fit Line, slope=$slopestr", color="black")
-    ax.set_title(wrap_regex("Convergence of $normtype Error Norm, Time Horizon = $(T) s", 50), fontsize=22, fontweight="bold")
-    ax.legend(loc="upper right", fontsize=20)
-    ax.set_xlabel("Number of cells", fontsize=20)
-    ax.set_ylabel("$normtype error norm", fontsize=20)
-    ax.grid(which="both")
-    fname = "$output_path$(Dates.now())_$(normtype)"
-    fig.savefig("$(fname)_convergence.png", bbox_inches="tight")
-    
-    return fig, ax
-end
-
-function plotSSHs(frame, mpasOcean, sshExact, desc="", output_path='.')
-    fig, axs = plt.subplots(1, 3, figsize=(9,3))
-
-    fig, ax = heatMapMesh(mpasOcean, mpasOcean.ssh, fig=fig, ax=axs[1])
-    ax.set_title("Numerical Solution")
-
-    fig, ax = heatMapMesh(mpasOcean, sshExact, fig=fig, ax=axs[2])
-    ax.set_title("Exact Solution")
-    
-    fig, ax = heatMapMesh(mpasOcean, sshExact -  mpasOcean.ssh, fig=fig, ax=axs[3])#, cMin=-0.005, cMax=0.005)
-    ax.set_title("Difference")
-    
-    fig.suptitle("SSH, $desc")
-    
-    fig.savefig("$(output_path)/ssh_cell_$(frame).png", bbox_inches="tight")
-    
-    return fig
-end
 
 function convergence_test(test_case;
                 write_data=false, show_plots=true, decimals=2, resolutions=[64, 128, 256, 512],
@@ -146,6 +101,7 @@ function convergence_test(test_case;
     L2ErrorNorm = zeros(Float64, nCases)
     
     T = 15000
+    output_path = ""
     
     for iCase = 1:nCases
         if test_case == "inertiaGravityWave"
@@ -163,7 +119,7 @@ function convergence_test(test_case;
         println()
         println("running test $iCase of $nCases, mesh: $mesh_file_name")
         ncells[iCase], dts[iCase], MaxErrorNorm[iCase], L2ErrorNorm[iCase] =
-                model_run(mesh_directory, mesh_file_name, periodicity, T, output_path;
+                model_run(test_case, mesh_directory, mesh_file_name, periodicity, T, output_path;
                         plot=show_plots, nvlevels=nvlevels)
     end
     
