@@ -68,4 +68,4 @@ convergence_test(
             "inertiaGravityWave",
             resolutions=[64, 144, 216, 324],
             format=(x->"$(x)x$(x)"),
-            write_data=true, show_plots=true, nvlevels=1)
+            write_data=true, show_plots=true, nvlevels=10)

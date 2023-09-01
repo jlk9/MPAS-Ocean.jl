@@ -54,7 +54,10 @@ mutable struct MPAS_Ocean
     restingThickness::Array{Float64,2}
     vertCoordMovementWeights::Array{Float64,1}         
     div_hu::Array{Float64,2}
+    div_hu_btr::Array{Float64,1}
     ssh::Array{Float64,1}    # sea surface height (cell-centered)
+    sshOld::Array{Float64,1}    # sea surface height (cell-centered)
+    projectedSSH::Array{Float64,1}    # sea surface height (cell-centered)
 
 
     ## edge-centered arrays
@@ -247,6 +250,7 @@ mutable struct MPAS_Ocean
         mpasOcean.ALE_thickness = zeros(Float64, (mpasOcean.nVertLevels, nCells))
         mpasOcean.vertAleTransportTop= zeros(Float64, (mpasOcean.nVertLevels+1, nCells))
         mpasOcean.div_hu = zeros(Float64, (mpasOcean.nVertLevels, nCells))
+        mpasOcean.div_hu_btr = zeros(Float64, nCells)
         
         
         # define coriolis parameter and bottom depth.
@@ -302,6 +306,8 @@ mutable struct MPAS_Ocean
         
         # ssh no longer prognostic, replaced with layerThickness
         mpasOcean.ssh= zeros(Float64, nCells)
+        mpasOcean.sshOld = zeros(Float64, nCells)
+        mpasOcean.projectedSSH = zeros(Float64, nCells)
 #         mpasOcean.sshTendency = zeros(Float64, nCells)
         
         mpasOcean.gravity = 9.8

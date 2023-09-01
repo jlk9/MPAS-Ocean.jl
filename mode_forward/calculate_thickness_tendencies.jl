@@ -4,6 +4,8 @@ include("../mode_init/MPAS_Ocean.jl")
 function calculate_thickness_tendency!(mpasOcean::MPAS_Ocean)
     mpasOcean.layerThicknessTendency .= 0.0
 
+    ## shared/mpas_ocn_thick_hadv.F
+    ## ocn_thick_hadv_tend
     # do iCell = 1, nCellsOwned
     #   invAreaCell = 1.0_RKIND / areaCell(iCell)
     #   do i = 1, nEdgesOnCell(iCell)
@@ -14,6 +16,15 @@ function calculate_thickness_tendency!(mpasOcean::MPAS_Ocean)
     #     end do
     #   end do
     # end do
+
+
+   ## shared/mpas_ocn_thick_vadv.F
+   ## ocn_thick_vadv_tend
+   # do iCell = 1, nCellsOwned
+   #    do k = minLevelCell(iCell), maxLevelCell(iCell)
+   #       tend(k,iCell) = tend(k,iCell) + vertAleTransportTop(k+1,iCell) - vertAleTransportTop(k,iCell)
+   #    end do
+   # end do
 
 
     @fastmath for iCell in 1:mpasOcean.nCells # Threads.@threads

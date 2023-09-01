@@ -1,16 +1,18 @@
 include("../mode_init/MPAS_Ocean.jl")
 
-function calculate_diagnostics!(mpasOcean::MPAS_Ocean)
+function calculate_diagnostics!(mpasOcean::MPAS_Ocean, dt)
 
     calculate_ssh!(mpasOcean)
     calculate_layer_thickness_edge!(mpasOcean)
     calculate_div_hu!(mpasOcean)
-    calculate_vertical_ale_transport!(mpasOcean)
+    calculate_vertical_ale_transport!(mpasOcean, dt)
 
 end
 
-function calculate_vertical_ale_transport!(mpasOcean::MPAS_Ocean)
+function calculate_vertical_ale_transport!(mpasOcean::MPAS_Ocean, dt)
 
+     ## shared/mpas_ocn_thick_ale.F
+     ## ocn_ALE_thickness
      # do iCell = 1, nCells
      #    kMax = maxLevelCell(iCell)
      #    kMin = minLevelCell(iCell)
@@ -39,10 +41,15 @@ function calculate_vertical_ale_transport!(mpasOcean::MPAS_Ocean)
             thicknessSum += mpasOcean.vertCoordMovementWeights[k] * mpasOcean.restingThickness[k,iCell]
         end
 
+        mpasOcean.projectedSSH[iCell] = mpasOcean.sshOld[iCell] - dt*mpasOcean.div_hu_btr[iCell]
+
         for k = 1:mpasOcean.maxLevelCell[iCell]
-            mpasOcean.ALE_thickness[k,iCell] = mpasOcean.restingThickness[k,iCell] + (mpasOcean.ssh[iCell] * mpasOcean.vertCoordMovementWeights[k] * mpasOcean.restingThickness[k,iCell])/thicknessSum
+            mpasOcean.ALE_thickness[k,iCell] = (mpasOcean.restingThickness[k,iCell] 
+                                             + (mpasOcean.projectedSSH[iCell] * mpasOcean.vertCoordMovementWeights[k] * mpasOcean.restingThickness[k,iCell])/thicknessSum)
         end
 
+        ## mpas_ocn_diagnostics.F
+        ## ocn_vert_transport_velocity_top
         # do iCell = 1,nCells
         #    vertAleTransportTop(1,iCell) = 0.0_RKIND
         #    vertAleTransportTop(maxLevelCell(iCell)+1,iCell) = 0.0_RKIND
@@ -57,7 +64,8 @@ function calculate_vertical_ale_transport!(mpasOcean::MPAS_Ocean)
         mpasOcean.vertAleTransportTop[1,iCell] = 0.0
         mpasOcean.vertAleTransportTop[mpasOcean.maxLevelCell[iCell]+1,iCell] = 0.0
         for k = mpasOcean.maxLevelCell[iCell]:-1:2
-           mpasOcean.vertAleTransportTop[k,iCell] = mpasOcean.vertAleTransportTop[k+1,iCell] - mpasOcean.div_hu[k,iCell] - (mpasOcean.ALE_thickness[k,iCell] - mpasOcean.layerThickness[k,iCell])/mpasOcean.dt 
+           mpasOcean.vertAleTransportTop[k,iCell] = (mpasOcean.vertAleTransportTop[k+1,iCell] 
+                                                  - mpasOcean.div_hu[k,iCell] - (mpasOcean.ALE_thickness[k,iCell] - mpasOcean.layerThicknessOld[k,iCell])/dt)
         end
     end
 
@@ -107,59 +115,40 @@ end
 
 function calculate_div_hu!(mpasOcean::MPAS_Ocean)
 
-
+    ## mpas_ocn_diagnostics.F
+    ## ocn_vert_transport_velocity_top
     # do iCell = 1, nCells
-    #    divergence(:,iCell) = 0.0_RKIND
-    #    kineticEnergyCell(:,iCell) = 0.0_RKIND
-    #    div_hu(:) = 0.0_RKIND
-    #    div_huTransport(:) = 0.0_RKIND
+    #    div_hu(:,iCell) = 0.0_RKIND
+    #    div_hu_btr      = 0.0_RKIND
     #    invAreaCell1 = invAreaCell(iCell)
-    #    kmin = minLevelCell(iCell)
-    #    kmax = maxLevelCell(iCell)
     #    do i = 1, nEdgesOnCell(iCell)
     #       iEdge = edgesOnCell(i, iCell)
-    #       edgeSignOnCell_temp = edgeSignOnCell(i, iCell)
-    #       dcEdge_temp = dcEdge(iEdge)
-    #       dvEdge_temp = dvEdge(iEdge)
-    #       do k = kmin,kmax
-    #          r_tmp = dvEdge_temp*normalVelocity(k,iEdge)*invAreaCell1
+    #       kmin = minLevelEdgeBot(iEdge)
+    #       kmax = maxLevelEdgeTop(iEdge)
 
-    #          divergence(k,iCell) = divergence(k,iCell) &
-    #                              - edgeSignOnCell_temp*r_tmp
-    #          div_hu(k) = div_hu(k) &
-    #                    - layerThicknessEdgeFlux(k,iEdge)* &
-    #                      edgeSignOnCell_temp*r_tmp
-    #          div_huTransport(k) = div_huTransport(k) &
-    #                             - layerThicknessEdgeFlux(k,iEdge)* &
-    #                               edgeSignOnCell_temp*dvEdge_temp* &
-    #                               normalTransportVelocity(k,iEdge)* &
-    #                               invAreaCell1
-    #          kineticEnergyCell(k,iCell) = kineticEnergyCell(k,iCell) &
-    #                                     + 0.25*r_tmp*dcEdge_temp* &
-    #                                       normalVelocity(k,iEdge)
+    #       do k = kmin, kmax 
+    #          flux = layerThicknessEdgeFlux(k,iEdge)* &
+    #                 normalVelocity(k,iEdge)*dvEdge(iEdge)* &
+    #                 edgeSignOnCell(i,iCell) * invAreaCell1
+    #          div_hu(k,iCell) = div_hu(k,iCell) - flux 
+    #          div_hu_btr = div_hu_btr - flux 
     #       end do
     #    end do
-    #    ! Vertical velocity at bottom is zero, initialized above.
-    #    vertVelocityTop(1:kmin-1,iCell) = 0.0_RKIND
-    #    vertVelocityTop(kmax+1  ,iCell) = 0.0_RKIND
-    #    vertTransportVelocityTop(1:kmin-1,iCell) = 0.0_RKIND
-    #    vertTransportVelocityTop(kmax+1  ,iCell) = 0.0_RKIND
-    #    do k = kmax, 1, -1
-    #       vertVelocityTop(k,iCell) = &
-    #       vertVelocityTop(k+1,iCell) - div_hu(k)
-    #       vertTransportVelocityTop(k,iCell) = &
-    #       vertTransportVelocityTop(k+1,iCell) - div_huTransport(k)
-    #    end do
+    #    projectedSSH(iCell) = oldSSH(iCell) - dt*div_hu_btr
     # end do
 
     mpasOcean.div_hu .= 0.0
+    mpasOcean.div_hu_btr .= 0.0
     for iCell in 1:mpasOcean.nCells
 
         for i in 1:mpasOcean.nEdgesOnCell[iCell]
             iEdge =  mpasOcean.edgesOnCell[i,iCell]
 
             for k = 1:mpasOcean.maxLevelCell[iCell]
-                mpasOcean.div_hu[k,iCell] -= mpasOcean.edgeSignOnCell[iCell,i] * mpasOcean.layerThicknessEdge[k,iEdge] * mpasOcean.normalVelocity[k,iEdge] * mpasOcean.dvEdge[iEdge] / mpasOcean.areaCell[iCell]
+                flux = (mpasOcean.edgeSignOnCell[iCell,i] * mpasOcean.layerThicknessEdge[k,iEdge] 
+                     * mpasOcean.normalVelocity[k,iEdge] * mpasOcean.dvEdge[iEdge] / mpasOcean.areaCell[iCell])
+                mpasOcean.div_hu[k,iCell] -= flux 
+                mpasOcean.div_hu_btr[iCell] -= flux 
             end
         end
     end

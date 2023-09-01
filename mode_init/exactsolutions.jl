@@ -24,7 +24,7 @@ function kelvinWaveGenerator(mpasOcean)
             mpasOcean.layerThickness[k,:] .+= sshperlayer # add, don't replace, thickness contributes to level depth
         end
 
-        nvperlayer = kelvinWaveExactNormalVelocity(mpasOcean, collect(1:mpasOcean.nEdges), t) / mpasOcean.nVertLevels
+        nvperlayer = kelvinWaveExactNormalVelocity(mpasOcean, collect(1:mpasOcean.nEdges), t)
         for k in 1:mpasOcean.nVertLevels
             mpasOcean.normalVelocity[k,:] .= nvperlayer
         end
@@ -80,7 +80,7 @@ function inertiaGravityWaveGenerator(mpasOcean, etaHat=1e0)
            
             nv = inertiaGravityExactNormalVelocity(mpasOcean, iEdge, t) 
             
-            mpasOcean.normalVelocity[:,iEdge] .= nv / mpasOcean.nVertLevels
+            mpasOcean.normalVelocity[:,iEdge] .= nv
         end
     end
 

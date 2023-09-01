@@ -1,5 +1,6 @@
 include("../mode_init/MPAS_Ocean.jl")
 include("time_steppers.jl")
+include("calculate_diagnostics.jl")
 include("../visualization.jl")
 include("../mode_init/exactsolutions.jl")
 
@@ -31,10 +32,11 @@ function model_run(test_case, mesh_directory, mesh_file_name, periodicity, T, ou
     mpasOcean.layerThicknessNew = copy(mpasOcean.layerThickness)
     mpasOcean.normalVelocityNew = copy(mpasOcean.normalVelocity)
     
-    sshExact = zeros(Float64, (mpasOcean.nCells))
+    calculate_ssh_new!(mpasOcean)
+    mpasOcean.sshOld = copy(mpasOcean.ssh)
     
+    sshExact = zeros(Float64, (mpasOcean.nCells))
     if plot
-        calculate_ssh_new!(mpasOcean)
         sshExact = exactSSH(mpasOcean, 1:mpasOcean.nCells)
         plotSSHs(1, mpasOcean, sshExact, "Initial Condition", output_path)
     end
