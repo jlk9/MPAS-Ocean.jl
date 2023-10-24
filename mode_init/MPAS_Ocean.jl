@@ -86,14 +86,14 @@ mutable struct MPAS_Ocean
     xVertex::Array{Float64,1}   
     yVertex::Array{Float64,1}   
     vertexDegree::Int64
-    cellsOnVertex::Array{Int64}
-    edgesOnVertex::Array{Int64}
-    edgeSignOnVertex::Array{Int8}
-    fVertex::Array{Float64}   
-    areaTriangle::Array{Float64}   
-    kiteAreasOnVertex::Array{Float64}   
-    maxLevelVertexTop::Array{Int64}
-    maxLevelVertexBot::Array{Int64}
+    cellsOnVertex::Array{Int64,2}
+    edgesOnVertex::Array{Int64,2}
+    edgeSignOnVertex::Array{Int8,2}
+    fVertex::Array{Float64,1}   
+    areaTriangle::Array{Float64,1}   
+    kiteAreasOnVertex::Array{Float64,2}   
+    maxLevelVertexTop::Array{Int64,1}
+    maxLevelVertexBot::Array{Int64,1}
     boundaryVertex::Array{Int64,2}
     vertexMask::Array{Int64,2}
 
