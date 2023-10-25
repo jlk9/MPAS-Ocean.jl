@@ -155,3 +155,58 @@ function calculate_div_hu!(mpasOcean::MPAS_Ocean)
 
 end
 
+"""
+Compute relative vorticity. 
+"""
+function calculate_relativeVorticity!(mpasOcean::MPAS_Ocean)
+
+#https://github.com/E3SM-Project/E3SM/blob/f502d67/components/mpas-ocean/src/shared/mpas_ocn_diagnostics.F#L610-L615
+mpasOcean.relativeVorticity .= 0.0
+
+#https://github.com/E3SM-Project/E3SM/blob/f502d67/components/mpas-ocean/src/shared/mpas_ocn_diagnostics.F#L629-L639
+
+@fastmath for iVertex in 1:mpasOcean.nVertices
+    invAreaTri1 = 1.0 / mpasOcean.areaTriangle[iVertex]
+    @fastmath for i in 1:mpasOcean.vertexDegree
+        iEdge = mpasOcean.edgesOnVertex[i, iVertex]
+        kmax = mpasOcean.maxLevelVertexBot[iVertex] 
+        @fastmath for k in 1:kmax
+            r_tmp = mpasOcean.dcEdge[iEdge] * mpasOcean.normalVelocity[k, iEdge] 
+            
+            # NOTE: indexing of edgeSignOnVertex does not match MPAS, dimension are flipped
+            mpasOcean.relativeVorticity[k, iVertex] += mpasOcean.edgeSignOnVertex[iVertex, i] * r_tmp * invAreaTri1
+            end
+        end
+    end
+end
+
+"""
+Compute divergence of horizontal velocity  ``\delta = \nabla \cdot \bm{u}``
+defined at primal gridcells
+Using Eqn. 21 from Ringler et al. 2010 
+"""
+function calculate_divergence!(mpasOcean::MPAS_Ocean)
+    # set the diagnostic solution to zero, effectivly wipping out the previous timesteps solution 
+    mpasOcean.divergence .= 0.0  
+    
+    #https://github.com/E3SM-Project/E3SM/blob/f502d67/components/mpas-ocean/src/shared/mpas_ocn_diagnostics.F#L1967-L1997
+    
+    # loop over cells 
+    @fastmath for iCell in 1:mpasOcean.nCells
+        invAreaCell1 = 1.0 / mpasOcean.areaCell[iCell]
+        # loop over edges of i-th cell 
+        @fastmath for i in 1:mpasOcean.nEdgesOnCell[iCell]
+            iEdge = mpasOcean.edgesOnCell[i,  iCell]
+            # this arrays shape is backwards c.f. all other arrays
+            edgeSignOnCell = mpasOcean.edgeSignOnCell[iCell, i]
+            dvEdge = mpasOcean.dvEdge[iEdge]
+            # loop over vertical layers on edge
+            @fastmath for k in 1:mpasOcean.maxLevelCell[iCell]
+                r_tmp = dvEdge*mpasOcean.normalVelocity[k,iEdge]*invAreaCell1
+    
+                mpasOcean.divergence[k, iCell] -= edgeSignOnCell*r_tmp
+                    
+            end 
+        end 
+    end 
+end

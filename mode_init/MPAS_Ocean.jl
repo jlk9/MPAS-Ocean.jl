@@ -53,6 +53,7 @@ mutable struct MPAS_Ocean
     ALE_thickness::Array{Float64,2}
     restingThickness::Array{Float64,2}
     vertCoordMovementWeights::Array{Float64,1}         
+    divergence::Array{Float64,2} # divergence of horizontal velocity (cell-centered)
     div_hu::Array{Float64,2}
     div_hu_btr::Array{Float64,1}
     ssh::Array{Float64,1}    # sea surface height (cell-centered)
@@ -96,7 +97,8 @@ mutable struct MPAS_Ocean
     maxLevelVertexBot::Array{Int64,1}
     boundaryVertex::Array{Int64,2}
     vertexMask::Array{Int64,2}
-
+    # diagnostic fields (vertex-centered)
+    relativeVorticity::Array{Float64,2}
 
     gridSpacingMagnitude::Float64
 
@@ -249,10 +251,12 @@ mutable struct MPAS_Ocean
         mpasOcean.vertCoordMovementWeights = zeros(Float64, mpasOcean.nVertLevels)
         mpasOcean.ALE_thickness = zeros(Float64, (mpasOcean.nVertLevels, nCells))
         mpasOcean.vertAleTransportTop= zeros(Float64, (mpasOcean.nVertLevels+1, nCells))
+        mpasOcean.divergence = zeros(Float64, (mpasOcean.nVertLevels, nCells))
         mpasOcean.div_hu = zeros(Float64, (mpasOcean.nVertLevels, nCells))
         mpasOcean.div_hu_btr = zeros(Float64, nCells)
         
-        
+        mpasOcean.relativeVorticity = zeros(Float64,(mpasOcean.nVertLevels, nVertices)) 
+
         # define coriolis parameter and bottom depth.
         # currently hard-wired to these values, uniform everywhere for linear case
         f0 = 0.0001 
