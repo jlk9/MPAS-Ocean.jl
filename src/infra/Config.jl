@@ -1,3 +1,4 @@
+using Dates
 using YAML
 
 """Types which inherit from `yaml_config` should have 
@@ -84,7 +85,7 @@ function ConfigRead(filepath::AbstractString)
 
     # load YAML file where dictionary keys are forced to types defined in 
     # the dictionary above. 
-    config = YAML.load_file(filepath, dicttype=dict_type)
+    config = YAML.load_file(filepath, MPAS_Custom_Constructor())#, dicttype=dict_type)
     
     # Extract the "streams" dictionary from the namelist dictionary 
     streams = pop!(config["omega"], "streams")
@@ -99,6 +100,52 @@ function ConfigRead(filepath::AbstractString)
     return GlobalConfig(name, stream)
 end
 
+# to do: Need to generalize this regex pattern to work for all the possible 
+#        MPAS timestamps options. 
+timestamp_pat = r"^(?:
+                    (?:(\d{1,4})-)?      (?# year)
+                    (?:(\d\d?)-)?        (?# month)
+                    (\d+)                (?# day)
+                    )?
+                    _?                  
+                    (\d\d):              (?# hour)
+                    (\d\d):              (?# minute)
+                    (\d\d)               (?# second)
+                    $"x 
+
+function construct_MPAS_TimeStamp(constructor::YAML.Constructor, node::YAML.Node)
+    value = YAML.construct_scalar(constructor, node)
+    mat = match(timestamp_pat, value)
+    if mat === nothing
+        throw(YAML.ConstructorError(nothing, nothing,
+            "could not make sense of timestamp format", node.start_mark))
+    end
+
+    h  = parse(Int, mat.captures[4])
+    m  = parse(Int, mat.captures[5])
+    s  = parse(Int, mat.captures[6])
+
+    # No Y/M/D info in timestamp
+    if all(mat.captures[1:3] .=== nothing)
+        return Time(h, m, s)
+    elseif all(mat.captures[1:2] .=== nothing)
+        return "time delta in days"
+    # add case for time detlas in months
+    end
+
+    yr = parse(Int, mat.captures[1])
+    mn = parse(Int, mat.captures[2])
+    dy = parse(Int, mat.captures[3])
+
+
+	# handle the interval options, year is allowed to be zero 	 
+	# but month and day are not 
+	if any(iszero.((mn,dy)))
+		return "time delta in years"
+	end 
+
+    return DateTime(yr, mn, dy, h, m, s)
+end
 
 # Make is so that the resolver and the constructor regex pattern 
 # are both added globably. 
@@ -116,83 +163,5 @@ function MPAS_Custom_Constructor()
 	yaml_constructors["tag:MPAS_timestamp"] = construct_MPAS_TimeStamp
 	# return an Construcutor object, which will parse the MPAS timestamps
 	YAML.Constructor(yaml_constructors)
-end 
-
-
-# TO DO: Need to generalize this regex pattern to work for all the possible 
-#        MPAS timestamps options. 
-timestamp_pat =
-    r"^(\d{4})-    (?# year)
-       (\d\d?)-    (?# month)
-       (\d\d?)     (?# day)
-      (?:
-		(?:_?)
-        (\d\d?):      (?# hour)
-        (\d\d):       (?# minute)
-        (\d\d)        (?# second)
-        (?:\.(\d*))?  (?# fraction)
-        (?:
-          [ \t]*(Z|(?:[+\-])(\d\d?)
-            (?:
-                :(\d\d)
-            )?)
-        )?
-      )?$"x
-
-function construct_MPAS_TimeStamp(constructor::YAML.Constructor, node::YAML.Node)
-    value = YAML.construct_scalar(constructor, node)
-    mat = match(timestamp_pat, value)
-    if mat === nothing
-        throw(YAML.ConstructorError(nothing, nothing,
-            "could not make sense of timestamp format", node.start_mark))
-    end
-
-    yr = parse(Int, mat.captures[1])
-    mn = parse(Int, mat.captures[2])
-    dy = parse(Int, mat.captures[3])
-
-	# handle the interval options, year is allowed to be zero 	 
-	# but month and day are not 
-	if any(iszero.((mn,dy)))
-		return "CANT PARSE INTERVALS YET"
-	end 
-
-    if mat.captures[4] === nothing
-        return Date(yr, mn, dy)
-    end
-
-    h = parse(Int, mat.captures[4])
-    m = parse(Int, mat.captures[5])
-    s = parse(Int, mat.captures[6])
-	
-	
-    if mat.captures[7] === nothing
-        return DateTime(yr, mn, dy, h, m, s)
-    end
-
-    ms = 0
-    if mat.captures[7] !== nothing
-        ms = mat.captures[7]
-        if length(ms) > 3
-            ms = ms[1:3]
-        end
-        ms = parse(Int, string(ms, repeat("0", 3 - length(ms))))
-    end
-
-    delta_hr = 0
-    delta_mn = 0
-
-    if mat.captures[9] !== nothing
-        delta_hr = parse(Int, mat.captures[9])
-    end
-
-    if mat.captures[10] !== nothing
-        delta_mn = parse(Int, mat.captures[10])
-    end
-
-    # TODO: Also, I'm not sure if there is a way to numerically set the timezone
-    # in Calendar.
-
-    return DateTime(yr, mn, dy, h, m, s, ms)
 end
 
