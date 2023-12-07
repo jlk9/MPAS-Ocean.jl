@@ -1,3 +1,6 @@
+# abstract alarm type 
+abstract type abstract_alarm end
+
 # creat a ESMF clock like structure 
 mutable struct Clock 
 
@@ -18,7 +21,11 @@ mutable struct Clock
     end 
 end 
 
-
+function advance!(clock::Clock)
+    clock.prevTime = clock.currTime
+    clock.currTime = clock.nextTime 
+    clock.nextTime = clock.currTime + clock.timeStep
+end 
 
 
 function mpas_create_clock(timeStep, startTime; stopTime=nothing, runDuration=nothing)
