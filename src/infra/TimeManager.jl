@@ -12,6 +12,8 @@ mutable struct Clock
     nextTime::DateTime
     timeStep::Period
 
+    alarms::Vector{AbstractAlarm}
+
     # How does it know the stop time? Is that set as an alarm? 
     function Clock(startTime::DateTime, timeStep::Period)
         currTime = startTime 
@@ -19,14 +21,22 @@ mutable struct Clock
         nextTime = currTime + timeStep
         
         # return an instance of our structure 
-        return new(startTime, currTime, prevTime, nextTime, timeStep)
+        return new(startTime, currTime, prevTime, nextTime, timeStep, AbstractAlarm[])
     end 
 end 
 
+function attachAlarm!(clock::Clock, alarm::AbstractAlarm)
+    push!(clock.alarms, alarm)
+end
+
 function advance!(clock::Clock)
+    # Advance clock attributes by one timestep. 
     clock.prevTime = clock.currTime
     clock.currTime = clock.nextTime 
     clock.nextTime = clock.currTime + clock.timeStep
+
+    # Update status of any attached alarms (via broadcasting)
+    updateStatus!.(clock.alarms, clock.currTime)
 end 
 
 
@@ -53,7 +63,10 @@ mutable struct PeriodicAlarm{S,B,DT,P} <: AbstractAlarm
     ringTime::DT                     # time at/after which alarm rings 
     ringInterval::P                   # interval at which this alarm rings
     ringTimePrev::Union{Nothing, DT} # previous alaram time for periodic alarms
-
+    
+    # if Period is closed inteval  (c.f.open), then how do you deal with the first timestep since the 
+    # `updateStatus` method is called at the end of the timestep, so if the alarm fall on the 
+    # first timestep it is always skipped. 
     function PeriodicAlarm(name::String, alarmInterval::Period, intervalStart::DateTime)
         # NOTE: should alarm ring on interval start? or only after the first interval 
         #       could be optional keyword in construtor based on option from the `io` 
