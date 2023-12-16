@@ -1,4 +1,5 @@
 using NCDatasets
+using UnPack
 
 # https://discourse.julialang.org/t/kwargs-in-new-or-safer-ways-of-constructing-immutable-structs/43555/12
 macro construct(T)
@@ -6,16 +7,16 @@ macro construct(T)
     esc(Expr(:call, T, fieldnames(dataType)...))
 end
 
-Base.@kwdef struct Mesh{dp,i1,i8}
+Base.@kwdef struct Mesh{dp,i1,i4}
     # dimension information
-    nCells::i8       # number of cells 
-    nEdges::i8       # number of edges 
-    maxEdges::i8     # max number of edges of cell
-    maxEdges2::i8    # ? 
-    nVertices::i8    # number of vertex on dual mesh 
-    nVertLevels::i8  # number of vertical layers
-    vertexDegree::i8 # ?
-    TWO::i8          # ?
+    nCells::i4       # number of cells 
+    nEdges::i4       # number of edges 
+    maxEdges::i4     # max number of edges of cell
+    maxEdges2::i4    # ? 
+    nVertices::i4    # number of vertex on dual mesh 
+    nVertLevels::i4  # number of vertical layers
+    vertexDegree::i4 # ?
+    TWO::i4          # ?
 
     ###########################################################################
     ##                      cell center values
@@ -40,21 +41,25 @@ Base.@kwdef struct Mesh{dp,i1,i8}
     # Depth [m] of the bottom of the ocean. Given as a positive distance from sea level.
     bottomDepth::Array{dp,1} = zeros(dp, nCells)
 
+    # ///////////// Misc /////////////
+    # Area [m^{2}] of each cell in the primary grid.
+    areaCell::Array{dp,1} = zeros(dp, nCells)
+    
     # //////////// Connectivity /////////////
     # List of cell indices that neighbor each cell
-    cellsOnCell::Array{i8,2} = zeros(i8, maxEdges, nCells)
+    cellsOnCell::Array{i4,2} = zeros(i4, maxEdges, nCells)
     # List of edges that border each cell
-    edgesOnCell::Array{i8,2} = zeros(i8, maxEdges, nCells)
+    edgesOnCell::Array{i4,2} = zeros(i4, maxEdges, nCells)
     # List of vertices that border each cell
-    verticesOnCell::Array{i8,2} = zeros(i8, maxEdges, nCells)
+    verticesOnCell::Array{i4,2} = zeros(i4, maxEdges, nCells)
     # Index of kite in dual grid, based on verticesOnCell
-    kiteIndexOnCell::Array{i8,2} = zeros(i8, maxEdges, nCells)
+    kiteIndexOnCell::Array{i4,2} = zeros(i4, maxEdges, nCells)
     # Number of edges that border each cell
-    nEdgesOnCell::Array{i8,1} = zeros(i8, nCells)
+    nEdgesOnCell::Array{i4,1} = zeros(i4, nCells)
     # Sign of edge contributions to a cell for each edge on cell.
     edgeSignOnCell::Array{i1,2} = zeros(i1, maxEdges, nCells)
     # Index to the last active ocean cell in each column
-    maxLevelCell::Array{i8,1} = zeros(i8, nCells)
+    maxLevelCell::Array{i4,1} = zeros(i4, nCells)
     # Mask for determining boundary cells. A boundary cell has at least one 
     # inactive cell neighboring it.
     boundaryCell::Array{i1,2} = zeros(i1, nVertLevels, nCells)
@@ -76,7 +81,7 @@ Base.@kwdef struct Mesh{dp,i1,i8}
     lonEdge::Array{dp,1} = zeros(dp, nEdges)
 
     # ///////////// Mesh Parameters ///////////// 
-    # Coriolis parameter [s^{-1}]
+    # Coriolis parameter at at edges [s^{-1}]
     fEdge::Array{dp,1} = zeros(dp, nEdges) 
     # Reconstruction weights associated with each of the edgesOnEdge
     weightsOnEdge::Array{dp,2} = zeros(dp, maxEdges2, nEdges)
@@ -90,49 +95,112 @@ Base.@kwdef struct Mesh{dp,i1,i8}
     angleEdge::Array{dp,1} = zeros(dp, nEdges)
     # Index to the last edge in a column with active ocean cells on both
     # sides of it
-    maxLevelEdgeTop::Array{i8,1} = zeros(i8, nEdges)
+    maxLevelEdgeTop::Array{i4,1} = zeros(i4, nEdges)
     # Index to the last edge in a column with at least one active ocean
     # cell on either side of it.
-    maxLevelEdgeBot::Array{i8,1} = zeros(i8, nEdges)
+    maxLevelEdgeBot::Array{i4,1} = zeros(i4, nEdges)
 
     # //////////// Connectivity /////////////
     # List of cells that straddle each edge
-    cellsOnEdge::Array{i8,2} = zeros(i8, TWO, nEdges)
+    cellsOnEdge::Array{i4,2} = zeros(i4, TWO, nEdges)
     # List of edges that border each of the cells that straddle each edge
-    edgesOnEdge::Array{i8,2} = zeros(i8, maxEdges2, nEdges)
+    edgesOnEdge::Array{i4,2} = zeros(i4, maxEdges2, nEdges)
     # List of vertices that straddle each edge
-    verticesOnEdge::Array{i8,2} = zeros(i8, TWO, nEdges)
+    verticesOnEdge::Array{i4,2} = zeros(i4, TWO, nEdges)
     # Number of edges that surround each of the cells that straddle each
     # edge. These edges are used to reconstruct the tangential velocities.
-    nEdgesOnEdge::Array{i8,1} = zeros(i8, nEdges)
+    nEdgesOnEdge::Array{i4,1} = zeros(i4, nEdges)
     # Mask for determining boundary edges. A boundary edge has only
     # one active ocean cell neighboring it.
-    boundaryEdge::Array{i8,2} = zeros(i8, nVertLevels, nEdges)
+    boundaryEdge::Array{i4,2} = zeros(i4, nVertLevels, nEdges)
     # Mask on edges that determines if computations should be done on edge.
-    edgeMask::Array{i8,2} = zeros(i8, nVertLevels, nEdges)
+    edgeMask::Array{i4,2} = zeros(i4, nVertLevels, nEdges)
+
+    ###########################################################################
+    ##                      vertex center values
+    ###########################################################################
+    
+    # /////////////  Coordinates  ///////////// 
+    # X coordinate of vertices in cartesian space
+    xVertex::Array{dp,1} = zeros(dp, nVertices)
+    # Y coordinate of vertices in cartesian space
+    yVertex::Array{dp,1} = zeros(dp, nVertices)
+    # Latitude location of vertices [radians]
+    latVertex::Array{dp,1} = zeros(dp, nVertices) 
+    # Longitude location of vertices [radians]
+    lonVertex::Array{dp,1} = zeros(dp, nVertices)
+
+    # ///////////// Mesh Parameters ///////////// 
+    # Coriolis parameter at vertices [s^{-1}]
+    fVertex::Array{dp,1} = zeros(dp, nVertices)
+
+    # ////////////// Misc //////////////////
+    # Area [m^{2}] of each cell (triangle) in the dual grid
+    areaTriangle::Array{dp,1} = zeros(dp, nVertices)
+    # Area [m^{2}] of the portions of each dual cell that are part of 
+    # each cellsOnVertex
+    kiteAreasOnVertex::Array{dp,2} = zeros(dp, vertexDegree, nVertices)
+   
+    # //////////// Connectivity /////////////
+    # List of cells that share a vertex
+    cellsOnVertex::Array{i4,2} = zeros(i4, vertexDegree, nVertices)
+    # List of edges that share a vertex as an endpoin
+    edgesOnVertex::Array{i4,2} = zeros(i4, vertexDegree, nVertices)
+    # Sign of edge contributions to a vertex for each edge on vertex.
+    # Represents directionality of vector connecting vertices
+    edgeSignOnVertex::Array{i1,2} = zeros(i4, maxEdges, nVertices)
+    # Mask for determining boundary vertices. A boundary vertex has at
+    # least one inactive cell neighboring it
+    # boundaryVertex::Array{i4,2} = zeros(i4, nVertLevels, nVertices)
+    # Mask on vertices that determines if computations should be done on vertice
+    vertexMask::Array{i4,2} = zeros(i4, nVertLevels, nVertices)
 end 
 
-# how do I construct the immutable struct in as concise of a way as possible. 
 function Mesh(meshPath::String)
     # read the NetCDF
-    ds_mesh = NCDataset(meshPath, "r") 
+    ds_mesh = NCDataset(meshPath, "r", format=:netcdf4) 
     
-    nCells = ds_mesh.dim["nCells"]
-    nEdges = ds_mesh.dim["nEdges"]
-    nVertices = ds_mesh.dim["nVertices"]
-    nVertLevels = ds_mesh.dim["nVertLevels"]
-    
-    TWO = ds_mesh.dim["TWO"]
-    maxEdges = ds_mesh.dim["maxEdges"]
-    maxEdges2 = ds_mesh.dim["maxEdges2"]
-    vertexDegree = ds_mesh.dim["vertexDegree"]
-    
+    # create a dictionary of the mesh dimension values for 
+    # structure construction
+    dims_dict = parseMeshData(ds_mesh)
 
-    Mesh{Float64, Int8, Int64}(; nCells=nCells, nEdges=nEdges, nVertices=nVertices,
-                                 nVertLevels=nVertLevels, TWO=TWO,
-                                 maxEdges=maxEdges, maxEdges2=maxEdges2,
-                                 vertexDegree=vertexDegree)
+    # return an instance of the `Mesh` struct
+    mesh = Mesh{Float64, Int8, Int32}(; dims_dict...)
+
+    readMeshFields!(mesh, ds_mesh)
+    return mesh
 end 
+
+
+function readMeshFields!(mesh::Mesh, ds_mesh::NCDataset)
+    
+    dims = [:nCells, 
+            :nEdges, 
+            :maxEdges, 
+            :maxEdges2, 
+            :nVertices, 
+            :nVertLevels, 
+            :vertexDegree, 
+            :TWO]
+
+    for property in string.(propertynames(mesh))
+        # skip the dimension fields as they have already been set, 
+        # and propetries not present in mesh file
+        if !(property in dims) && haskey(ds_mesh, property)
+            
+            T = eltype(ds_mesh[property])    # Type
+            I = eachindex(ds_mesh[property]) # Indexes
+            N = ndims(ds_mesh[property])     # Number of dims
+            
+            # make sure the mesh reading is type stable. 
+            @assert T == eltype(getproperty(mesh, Symbol(property)))
+            
+            # While the mesh structure is mutable, the array withinit are not. 
+            # therefore the `.=` is needed when setting the values of the field arrrays.
+            getproperty(mesh, Symbol(property)) .= ds_mesh[property][I] :: Array{T,N}
+        end 
+    end 
+end
 
 function getDimensionInfo(ds_mesh::NCDataset)
     
@@ -141,13 +209,24 @@ function parseMeshData(ds_mesh::NCDataset)
     """ Method creates a dictionary of the mesh info to be used 
         for immutable strcutre creation
     """
-    mesh_data = Dict{Symbol, Any}()
+    dims_dict = Dict{Symbol, Any}()
     
-    mesh_data[:nCells] = ds_mesh.dim["nCells"]
-    mesh_data[:nEdges] = ds_mesh.dim["nEdges"]
+    dims_dict[:nCells] = ds_mesh.dim["nCells"]
+    dims_dict[:nEdges] = ds_mesh.dim["nEdges"]
+    dims_dict[:nVertices] = ds_mesh.dim["nVertices"]
+    dims_dict[:nVertLevels] = ds_mesh.dim["nVertLevels"]
+    
+    dims_dict[:TWO] = ds_mesh.dim["TWO"]
+    dims_dict[:maxEdges] = ds_mesh.dim["maxEdges"]
+    dims_dict[:maxEdges2] = ds_mesh.dim["maxEdges2"]
+    dims_dict[:vertexDegree] = ds_mesh.dim["vertexDegree"]
 
-    return mesh_data
+    return dims_dict
 end 
 
 file_path = "/pscratch/sd/a/anolan/inertial_gravity_wave/ocean/planar/inertial_gravity_wave/init/100km/initial_state.nc"
 
+#@inline UnPack.unpack = (x::NCDataset{Nothing}, ::Val{k})  where {k} = x[string(k)]
+
+mesh = Mesh(file_path)
+#ds_mesh = NCDataset(file_path, "r", format=:netcdf4)
