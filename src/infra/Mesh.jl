@@ -1,6 +1,3 @@
-using NCDatasets
-using UnPack
-
 # https://discourse.julialang.org/t/kwargs-in-new-or-safer-ways-of-constructing-immutable-structs/43555/12
 macro construct(T)
     dataType = Core.eval(__module__, T)
@@ -156,21 +153,41 @@ Base.@kwdef struct Mesh{dp,i1,i4}
     vertexMask::Array{i4,2} = zeros(i4, nVertLevels, nVertices)
 end 
 
-function Mesh(meshPath::String)
+function ReadMesh(meshPath::String)
     # read the NetCDF
     ds_mesh = NCDataset(meshPath, "r", format=:netcdf4) 
     
     # create a dictionary of the mesh dimension values for 
     # structure construction
-    dims_dict = parseMeshData(ds_mesh)
+    dims_dict = getDimensionInfo(ds_mesh)
 
     # return an instance of the `Mesh` struct
     mesh = Mesh{Float64, Int8, Int32}(; dims_dict...)
 
+    # populate the mesh with the input fields from the file
     readMeshFields!(mesh, ds_mesh)
+
     return mesh
 end 
 
+function getDimensionInfo(ds_mesh::NCDataset)
+    """ Method creates a dictionary of the mesh info to be used 
+        for immutable strcutre creation
+    """
+    dims_dict = Dict{Symbol, Any}()
+    
+    dims_dict[:nCells] = ds_mesh.dim["nCells"]
+    dims_dict[:nEdges] = ds_mesh.dim["nEdges"]
+    dims_dict[:nVertices] = ds_mesh.dim["nVertices"]
+    dims_dict[:nVertLevels] = ds_mesh.dim["nVertLevels"]
+    
+    dims_dict[:TWO] = ds_mesh.dim["TWO"]
+    dims_dict[:maxEdges] = ds_mesh.dim["maxEdges"]
+    dims_dict[:maxEdges2] = ds_mesh.dim["maxEdges2"]
+    dims_dict[:vertexDegree] = ds_mesh.dim["vertexDegree"]
+
+    return dims_dict
+end 
 
 function readMeshFields!(mesh::Mesh, ds_mesh::NCDataset)
     
@@ -202,31 +219,49 @@ function readMeshFields!(mesh::Mesh, ds_mesh::NCDataset)
     end 
 end
 
-function getDimensionInfo(ds_mesh::NCDataset)
-    
-end
-function parseMeshData(ds_mesh::NCDataset)
-    """ Method creates a dictionary of the mesh info to be used 
-        for immutable strcutre creation
-    """
-    dims_dict = Dict{Symbol, Any}()
-    
-    dims_dict[:nCells] = ds_mesh.dim["nCells"]
-    dims_dict[:nEdges] = ds_mesh.dim["nEdges"]
-    dims_dict[:nVertices] = ds_mesh.dim["nVertices"]
-    dims_dict[:nVertLevels] = ds_mesh.dim["nVertLevels"]
-    
-    dims_dict[:TWO] = ds_mesh.dim["TWO"]
-    dims_dict[:maxEdges] = ds_mesh.dim["maxEdges"]
-    dims_dict[:maxEdges2] = ds_mesh.dim["maxEdges2"]
-    dims_dict[:vertexDegree] = ds_mesh.dim["vertexDegree"]
 
-    return dims_dict
+function meshSignIndexFields!(mesh::Mesh)
+    
+    @unpack nCells, nEdgesOnCell, nVertices, vertexDegree = mesh 
+    @unpack edgesOnCell, edgesOnVertex = mesh 
+    @unpack cellsOnVertex, cellsOnEdge = mesh 
+    @unpack verticesOnEdge, verticesOnCell = mesh
+    @unpack edgeSignOnCell, kiteIndexOnCell, edgeSignOnVertex = mesh
+
+
+    @inbounds for iCell in 1:nCells
+       @inbounds for i in 1:nEdgesOnCell[iCell]
+            iEdge = edgesOnCell[i, iCell]
+            # vector points to from cell 1 to cell 2 
+            edgeSignOnCell[i, iCell] = (iCell == cellsOnEdge[1, iEdge]) ? -1 : 1
+            
+            iVertex = verticesOnCell[i, iCell]
+            @inbounds for j in 1:vertexDegree
+                kiteIndexOnCell[i, iCell] = cellsOnVertex[j,iVertex] == iCell && (j)
+            end 
+        end 
+    end 
+
+
+    @inbounds for iVertex in 1:nVertices
+        @inbounds for i in 1:vertexDegree 
+            iEdge = edgesOnVertex[i, iVertex]
+            # Vector points from vertex 1 to vertex 2 
+            if iVertex == verticesOnEdge[1, iEdge]
+                edgeSignOnVertex[i, iVertex] = -1 
+            else 
+                edgeSignOnVertex[i, iVertex] = 1 
+            end
+            #edgeSignOnVertex[i, iVertex] = (iVertex == verticesOnEdge[1,iEdge]) ? -1 : 1
+        end 
+    end 
+
+    # Doesn't work because we have an immutable strucutre, even though the fields themselevs 
+    # are mutable 
+    #@pack! mesh = edgeSignOnCell, kiteIndexOnCell, edgeSignOnVertex
+    
+    mesh.edgeSignOnCell .= edgeSignOnCell 
+    mesh.kiteIndexOnCell .= kiteIndexOnCell 
+    mesh.edgeSignOnVertex .= edgeSignOnVertex
 end 
 
-file_path = "/pscratch/sd/a/anolan/inertial_gravity_wave/ocean/planar/inertial_gravity_wave/init/100km/initial_state.nc"
-
-#@inline UnPack.unpack = (x::NCDataset{Nothing}, ::Val{k})  where {k} = x[string(k)]
-
-mesh = Mesh(file_path)
-#ds_mesh = NCDataset(file_path, "r", format=:netcdf4)

@@ -1,6 +1,7 @@
-using Dates
-using YAML
 
+import YAML: compose, Resolver, Composer, forward!, StreamStartEvent, compose_document, 
+             StreamEndEvent, peek, DocumentStartEvent, TokenStream, Constructor, load, 
+             EventStream, Node, construct_document
 """Types which inherit from `yaml_config` should have 
 a `dict` attribute. 
 """
@@ -85,8 +86,10 @@ function ConfigRead(filepath::AbstractString)
 
     # load YAML file where dictionary keys are forced to types defined in 
     # the dictionary above. 
-    config = YAML.load_file(filepath, MPAS_Custom_Constructor())#; dicttype=dict_type)
-    
+    config = open(filepath, "r") do input
+        load(input, MPAS_Custom_Constructor(); resolver=MPAS_Custom_Resolver())
+    end 
+
     # Extract the "streams" dictionary from the namelist dictionary 
     streams = pop!(config["omega"], "streams")
     # Extract the "namelist" dictionary from the global YAML file 
@@ -102,7 +105,7 @@ end
 
 # to do: Need to generalize this regex pattern to work for all the possible 
 #        MPAS timestamps options. 
-timestamp_pat = r"^(?:
+const timestamp_pat = r"^(?:
                     (?:(\d{1,4})-)?      (?# year)
                     (?:(\d\d?)-)?        (?# month)
                     (\d+)                (?# day)
@@ -196,12 +199,22 @@ function construct_MPAS_TimeStamp(constructor::YAML.Constructor, node::YAML.Node
 
     #return DateTime(yr, mn, dy, h, m, s)
 end
+ 
+function MPAS_Custom_Resolver()
+    # Make is so that the resolver and the constructor regex pattern 
+    # are both added globably. 
+    MPAS_TimeStamp_Resolver = tuple("tag:MPAS_timestamp", timestamp_pat) 
+ 
+    # Instansiate the Resolver struct, so that the defaults can be 
+    # over written and passed to our custom `load` method 
+    resolver = Resolver()
 
-# Make is so that the resolver and the constructor regex pattern 
-# are both added globably. 
-MPAS_TimeStamp_Resolver = tuple("tag:MPAS_timestamp", timestamp_pat) 
-# append the custom MPAS timestamp resolver to the end of the arrray 
-append!(YAML.default_implicit_resolvers, [MPAS_TimeStamp_Resolver])
+    # append the custom MPAS timestamp resolver to the end of the arrray
+    # of regex patterns within the instance of the `Resolver`
+    push!(resolver.implicit_resolvers, MPAS_TimeStamp_Resolver)
+
+    resolver 
+end 
 
 """Create a custom constructor object, which is able to parse 
 the MPAS timestamp format. 
@@ -214,4 +227,25 @@ function MPAS_Custom_Constructor()
 	# return an Construcutor object, which will parse the MPAS timestamps
 	YAML.Constructor(yaml_constructors)
 end
+
+
+function compose(events; resolver::Union{Resolver, Nothing}=nothing)
+    # if no resolver was passed, return default resolver. 
+    # otherwise use resolver passed as kwarg 
+    resolver = resolver ==  nothing ? Resolver : resolver 
+    composer = Composer(events, Dict{String, Node}(), resolver)
+    @assert typeof(forward!(composer.input)) == StreamStartEvent
+    node = compose_document(composer)
+    if typeof(peek(composer.input)) == StreamEndEvent
+        forward!(composer.input)
+    else 
+        @assert typeof(peek(composer.input)) == DocumentStartEvent
+    end 
+    node
+end 
+
+load(ts::TokenStream, constructor::Constructor; resolver::Resolver) = 
+    construct_document(constructor, compose(EventStream(ts); resolver=resolver))
+
+load(input::IO, constructor::Constructor; kwargs...) = load(TokenStream(input), constructor; kwargs...)
 

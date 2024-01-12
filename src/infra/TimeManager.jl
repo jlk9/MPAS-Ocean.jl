@@ -1,5 +1,3 @@
-using Dates 
-
 # abstract alarm type 
 abstract type AbstractAlarm end 
 
@@ -39,6 +37,13 @@ function advance!(clock::Clock)
     updateStatus!.(clock.alarms, clock.currTime)
 end 
 
+
+# create new abstract struct similar to alarms, which contains infromation
+# about what to do when the alarm is ringing. Then a single function 
+# e.g. `stopringing` can be call for each alarm, which does the various 
+# things needed to be done (e.g. io, forcing, restart, analysis) when an alarm rings. 
+# Find out in the current code what alarms are used for to think about the 
+# type interface
 
 mutable struct OneTimeAlarm{S,B,DT} <: AbstractAlarm
     name::S       # name of the alarm 
