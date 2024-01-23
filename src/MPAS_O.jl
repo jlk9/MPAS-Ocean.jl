@@ -10,7 +10,14 @@ module MPAS_O
     include("infra/Mesh.jl")
     include("infra/TimeManager.jl")
     include("infra/ModelSetup.jl")
-    include("infra/PrognosticVars.jl")
+
+    include("ocn/PrognosticVars.jl")
+    include("ocn/DiagnosticVars.jl")
+
+    include("ocn/Tendencies/TendencyVars.jl")
+    include("ocn/Tendencies/normalVelocity.jl")
+    include("ocn/Tendencies/layerThickness.jl")
 
     include("forward/init.jl")
+    include("forward/time_integration.jl")
 end 

@@ -1,20 +1,27 @@
 mutable struct DiagnosticVars{F}
     
-    # NOTE: Is this a scratch array?? 
-    #       This isn't realy needed to be allocated as Diagnostic Array
-    # var: flux divergence [m s^{-1}] ? 
-    # dim: (nVertLevels, nCells)
-    div_hu::Array{F,2}
-
-    # var: Gradient of sea surface height at edges. [-] 
-    # dim: (nEdges), Time)?
-    gradSSH::Array{F,1}
-    
     # var: layer thickness averaged from cell centers to edges [m]
     # dim: (nVertLevels, nEdges) Time?)
     layerThicknessEdge::Array{F,2}
 
-    #=
+    #= Performance Note: 
+    # ###########################################################
+    #  While these can be stored as diagnostic variales I don't 
+    #  really think we need to do that. Only used locally within 
+    #  tendency calculations, so should be more preformant to 
+    #  calculate the values locally within the tendency loops. 
+    # ###########################################################
+     
+    # var: flux divergence [m s^{-1}] ? 
+    # dim: (nVertLevels, nCells)
+    div_hu::Array{F,2}
+    
+    # var: Gradient of sea surface height at edges. [-] 
+    # dim: (nEdges), Time)?
+    gradSSH::Array{F,1}
+    =#
+    
+    #= UNUSED FOR NOW:
     # var: horizontal velocity, tangential to an edge [m s^{-1}] 
     # dim: (nVertLevels, nEdges)
     tangentialVelocity::Array{F, 2}
@@ -37,26 +44,18 @@ function DiagnosticVars_init(Config::GlobalConfig, Mesh::Mesh)
     # need to be done, such that only diagnostic variables required by 
     # the `Config` or requested by the `streams` will be activated. 
     
-    div_hu = zeros(Float64, nVertLevels, nCells)
-    gradSSH = zeros(Float64, nEdges)
+    #div_hu = zeros(Float64, nVertLevels, nCells)
+    #gradSSH = zeros(Float64, nEdges)
     layerThicknessEdge = zeros(Float64, nVertLevels, nEdges) 
     
-    DiagnosticVars{Float64}(div_hu, gradSSH, layerThicknessEdge)
+    DiagnosticVars{Float64}(layerThicknessEdge)
 end 
 
 function diagnostic_compute!(Mesh::Mesh, Diag::DiagnosticVars, Prog::PrognosticVars)
-    
-    for diagnostic in propertynames(Diag)
-        diagnostic_compute!(Mesh, Diag, Prog, diagnostic)
-    end 
 
-    #= above is equivalent to: 
-    diagnostic_compute!(Mesh, Diag, Prog, :ssh)
-    diagnostic_compute!(Mesh, Diag, Prog, :layerThicknessEdge) 
-    diagnostic_compute!(Mesh, Diag, Proh, :div_hu)
-    =#
+    calculate_layerThicknessEdge!(Mesh, Diag, Prog)
+
 end 
-
 
 #= Preformance Note:
    -----------------------------------------------------------------------
@@ -70,46 +69,60 @@ end
     version of the inner function (e.g. `calculate_gradSSH`) if there are multiple 
     configuration options for how to calculate that term. 
 =# 
-function diagnostic_compute!(Mesh::Mesh, Diag::DiagnosticVars, Prog::PrognosticVars, :layerThicknessEdge)
 
-   @unpack layerThickness = Prog 
-   @unpack layerThicknessEdge = Diag 
+#function diagnostic_compute!(Mesh::Mesh,
+#                             Diag::DiagnosticVars,
+#                             Prog::PrognosticVars,
+#                             :layerThicknessEdge)
+#
+#   @unpack layerThickness = Prog 
+#   @unpack layerThicknessEdge = Diag 
+#    
+#   calculate_layerThicknessEdge!(Mesh, layerThicknessEdge, layerThickness)
+#
+#   @pack! layerThicknessEdge = Diag
+#end 
+
+function calculate_layerThicknessEdge!(Mesh::Mesh,
+                                       Diag::DiagnosticVars,
+                                       Prog::PrognosticVars)
     
-   calculate_layerThicknessEdge!(Mesh, layerThicknessEdge, layerThickness)
-
-   @pack layerThicknessEdge = Diag
-end 
-
-function calculate_layerThicknessEdge!(Mesh::Mesh, layerThicknessEdge, layerThickness)
-    
+    @unpack layerThickness = Prog 
+    @unpack layerThicknessEdge = Diag 
     @unpack nEdges, cellsOnEdge, maxLevelEdgeTop = Mesh
 
     @fastmath for iEdge in 1:nEdges
         
-        # Why doesn't this have a check for bondary edges like `calculate_gradSSH!`?
-
         cell1Index = cellsOnEdge[1,iEdge]
         cell2Index = cellsOnEdge[2,iEdge]
 
         @fastmath for k in 1:maxLevelEdgeTop[iEdge]
-            layerThicknessEdge[k,iEdge] = 0.5 * (layerThickness[k,cell1Index] + layerThickness[k, cell2Index])
+            layerThicknessEdge[k,iEdge] = 0.5 * (layerThickness[k,cell1Index] +
+                                                 layerThickness[k, cell2Index])
         end 
     end 
+
+    @pack! layerThicknessEdge = Diag
 end 
 
-function diagnositc_compute!(Mesh::Mesh, Diag::DiagnosticVars, Prog::PrognosticVars, :gradSSH) 
-    @unpack ssh = Prog
-    @unpack gradSSH = Diag
-    
-    calculate_gradSSH!(Mesh, gradSSH, ssh)
-
-    @pack gradSSH = Diag
-end 
+#= 
+#function diagnositc_compute!(Mesh::Mesh, Diag::DiagnosticVars, Prog::PrognosticVars, :gradSSH) 
+#    @unpack ssh = Prog
+#    @unpack gradSSH = Diag
+#    
+#    calculate_gradSSH!(Mesh, gradSSH, ssh)
+#
+#    @pack! gradSSH = Diag
+#end 
 
 # AGAIN, not really sure if this need to be a Diagnostic, since this Requires 
 # array allocations, wheres this could be done locally in the momentum tendency term
-function calculate_gradSSH!(Mesh::Mesh, gradSSH, ssh)
+function calculate_gradSSH!(Mesh::Mesh,
+                            Diag::DiagnosticVars,
+                            Prog::PrognosticVars)
     
+    @unpack ssh = Prog
+    @unpack gradSSH = Diag
     @unpack nEdges, boundaryEdge, cellsOnEdge, maxLevelEdgeTop, dcEdge = Mesh
     
     @fastmath for iEdge in 1:nEdges
@@ -123,18 +136,25 @@ function calculate_gradSSH!(Mesh::Mesh, gradSSH, ssh)
             gradSSH[k,iEdge] = (ssh[k,cell1Index] - ssh[k,cell2Index]) / dcEdge[iEdge] 
         end 
     end 
+
+    @pack! gradSSH = Diag
 end 
  
-function diagnostic_compute!(Mesh::Mesh, Diag::DiagnosicVars, Prog::PrognosticVars, :div_hu)
+#function diagnostic_compute!(Mesh::Mesh, Diag::DiagnosicVars, Prog::PrognosticVars, :div_hu)
+#   @unpack normalVelocity = Prog 
+#   @unpack layerThicknessEdge, div_hu = Diag
+#
+#   calculate_div_hu!(Mesh, layerThicknessEdge, normalVelocity, div_hu)
+#
+#   @pack! div_hu = Diag 
+#end 
+
+function calculate_div_hu!(Mesh::Mesh,
+                           Diag::DiagnosticVars,
+                           Prog::PrognosticVars)
+
    @unpack normalVelocity = Prog 
    @unpack layerThicknessEdge, div_hu = Diag
-
-   calculate_div_hu!(Mesh, layerThicknessEdge, normalVelocity, div_hu)
-
-   @pack div_hu = Diag 
-end 
-
-function calculate_div_hu!(Mesh::Mesh, layerThicknessEdge, normalVelocity, div_hu)
    @unpack nCells, nEdgesOnCell = Mesh
    @unpack edgesOnCell, edgeSignOnCell = Mesh  
    @unpack dvEdge, areaCell, maxLevelCell = Mesh 
@@ -152,4 +172,8 @@ function calculate_div_hu!(Mesh::Mesh, layerThicknessEdge, normalVelocity, div_h
            div_hu[k,iCell] -= flux 
        end 
    end 
-end 
+
+   @pack! div_hu = Diag 
+
+end
+=#

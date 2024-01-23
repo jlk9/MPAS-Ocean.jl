@@ -13,7 +13,7 @@ mutable struct PrognosticVars{F<:AbstractFloat}
 
     # var: layer thickness [m]
     # dim: (nVertLevels, nCells, Time)
-    layerThickness::Array{F,3
+    layerThickness::Array{F,3}
 
     ####################
     # UNUSED FOR NOW: 
