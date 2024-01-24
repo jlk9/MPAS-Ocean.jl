@@ -51,7 +51,7 @@ function PrognosticVars_init(config::GlobalConfig, mesh::Mesh)
 
     input = NCDataset(input_filename)
 
-    ssh = zeros(Float64, nVertLevels, nCells, nTimeLevels)
+    ssh = zeros(Float64, nCells, nTimeLevels)
     # TO DO: check that the input file only has one time level 
     ssh[:,1] = input["ssh"][:,:]
     

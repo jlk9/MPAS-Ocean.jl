@@ -76,11 +76,11 @@ end
 #                             :layerThicknessEdge)
 #
 #   @unpack layerThickness = Prog 
-#   @unpack layerThicknessEdge = Diag 
+#   @unpack layerThicknessEdge 
 #    
 #   calculate_layerThicknessEdge!(Mesh, layerThicknessEdge, layerThickness)
 #
-#   @pack! layerThicknessEdge = Diag
+#   @pack! Diag = layerThicknessEdge
 #end 
 
 function calculate_layerThicknessEdge!(Mesh::Mesh,
@@ -102,17 +102,17 @@ function calculate_layerThicknessEdge!(Mesh::Mesh,
         end 
     end 
 
-    @pack! layerThicknessEdge = Diag
+    @pack! Diag = layerThicknessEdge
 end 
 
 #= 
 #function diagnositc_compute!(Mesh::Mesh, Diag::DiagnosticVars, Prog::PrognosticVars, :gradSSH) 
 #    @unpack ssh = Prog
-#    @unpack gradSSH = Diag
+#    @unpack gradSSH
 #    
 #    calculate_gradSSH!(Mesh, gradSSH, ssh)
 #
-#    @pack! gradSSH = Diag
+#    @pack! Diag = gradSSH
 #end 
 
 # AGAIN, not really sure if this need to be a Diagnostic, since this Requires 
@@ -137,7 +137,7 @@ function calculate_gradSSH!(Mesh::Mesh,
         end 
     end 
 
-    @pack! gradSSH = Diag
+    @pack! Diag = gradSSH
 end 
  
 #function diagnostic_compute!(Mesh::Mesh, Diag::DiagnosicVars, Prog::PrognosticVars, :div_hu)
@@ -146,7 +146,7 @@ end
 #
 #   calculate_div_hu!(Mesh, layerThicknessEdge, normalVelocity, div_hu)
 #
-#   @pack! div_hu = Diag 
+#   @pack! Diag = div_hu 
 #end 
 
 function calculate_div_hu!(Mesh::Mesh,
@@ -173,7 +173,7 @@ function calculate_div_hu!(Mesh::Mesh,
        end 
    end 
 
-   @pack! div_hu = Diag 
+   @pack! Diag = div_hu 
 
 end
 =#

@@ -1,9 +1,21 @@
+using MPAS_O
+
+
+# file path to the config file. Should be parsed from the command line 
+config_fp = "/global/homes/a/anolan/MPAS-Ocean.jl/bare_minimum.yml"
 
 # Initialize the Model  
-ocn_init()
+Setup, Diag, Tend, Prog = ocn_init(config_fp)
+
+clock = Setup.timeManager
 
 # Run the model 
-ocn_run()
+while !isRinging(clock.alarms[1])
 
-# is this actually needed since we don't have to do array allocations?
-ocn_finalize()
+    println(clock.currTime)
+    
+    advance!(clock)
+    
+    ocn_timestep(Prog, Diag, Tend, Setup)
+
+end 

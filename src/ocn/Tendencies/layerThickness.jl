@@ -15,9 +15,9 @@ function computeLayerThicknessTendency!(Mesh::Mesh,
 
     # NOTE: Forcing would be applied here
 
-    horizontal_advection_tendency!(Mesh::Mesh,
-                                   normalVelocity,
-                                   layerThicknessEdge,
+    horizontal_advection_tendency!(Mesh,
+                                   normalVelocity[:,:,1],
+                                   layerThicknessEdge[:,:,1],
                                    tendLayerThickness)
     #=
     vertical_advection_tendency!(Mesh::Mesh,
@@ -25,7 +25,7 @@ function computeLayerThicknessTendency!(Mesh::Mesh,
                                  tendLayerThickness)
     =# 
 
-    @pack! tendLayerThickness = Tend
+    @pack! Tend = tendLayerThickness
 end 
 
 function horizontal_advection_tendency!(Mesh::Mesh,

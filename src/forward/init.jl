@@ -1,4 +1,4 @@
-function forward_mode_init(Config_filepath)
+function ocn_init(Config_filepath)
     
     # read the configuration file 
     Config = ConfigRead(Config_filepath)
@@ -13,15 +13,21 @@ function forward_mode_init(Config_filepath)
     Clock = ocn_setup_clock(Config)
     
     # return the model setup instance
-    ModelSetup(Config, Mesh, Clock)
+    Setup = ModelSetup(Config, Mesh, Clock)
 
     # Diganostics should be intialized here, 
     # this should just allocate the array, but first computation 
     # should get done in time integration loop. 
+    Diag = DiagnosticVars_init(Config, Mesh) 
+    
+    # Tendencies are initialized here
+    Tend = TendencyVars(Config, Mesh)
 
     # Prognostics should be intialized here, 
     # add option to read from input file (i.e. mesh) or from restrart
     Prog = PrognosticVars_init(Config, Mesh)
+
+    return Setup, Diag, Tend, Prog
 end 
 
 
@@ -62,12 +68,20 @@ function ocn_setup_clock(Config::GlobalConfig)
         clock = mpas_create_clock(dt, start_time; runDuration=run_duration)
         if stop_time != "none" 
             start_time + run_duration != stop_time && println("Warning: config_run_duration and config_stop_time are inconsitent: using config_run_duration.")
+        else 
+            stop_time = start_time + run_duration
         end 
     elseif stop_time != "none"
         clock = mpas_create_clock(dt, start_time; stopTime=stop_time)
     else 
         throw("Error: Neither config_run_duration nor config_stop_time were specified.")
     end
+    
+    # create the end of simulation alarm 
+    simulationAlarm = OneTimeAlarm("simulation_end", stop_time)
+        
+    # attached the simulation_end alarm to the clock 
+    attachAlarm!(clock, simulationAlarm)
 
     return clock
 end 

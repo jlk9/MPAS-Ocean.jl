@@ -1,6 +1,6 @@
 module MPAS_O
     
-    export forward_mode_init
+    export ocn_init, isRinging, advance!, ocn_timestep
 
     using Dates, YAML, NCDatasets, UnPack
     
