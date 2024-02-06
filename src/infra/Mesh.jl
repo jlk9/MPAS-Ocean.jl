@@ -137,7 +137,11 @@ Base.@kwdef struct Mesh{dp,i1,i4}
     # Area [m^{2}] of the portions of each dual cell that are part of 
     # each cellsOnVertex
     kiteAreasOnVertex::Array{dp,2} = zeros(dp, vertexDegree, nVertices)
-   
+    # Index to the last vertex in a column with all active cells around it. 
+    maxLevelVertexTop::Array{i4,1} = zeros(i4, nVertices)
+    # Index to the last vertex in a column with at least one active
+    # ocean cell around it
+    maxLevelVertexBot::Array{i4,1} = zeros(i4, nVertices)
     # //////////// Connectivity /////////////
     # List of cells that share a vertex
     cellsOnVertex::Array{i4,2} = zeros(i4, vertexDegree, nVertices)
@@ -166,6 +170,12 @@ function ReadMesh(meshPath::String)
 
     # populate the mesh with the input fields from the file
     readMeshFields!(mesh, ds_mesh)
+    
+    # sign and index fields 
+    meshSignIndexFields!(mesh)
+    # compute min/max levels for edges and vertices 
+    meshMinMaxLevel!(mesh) 
+
 
     return mesh
 end 
@@ -228,40 +238,105 @@ function meshSignIndexFields!(mesh::Mesh)
     @unpack verticesOnEdge, verticesOnCell = mesh
     @unpack edgeSignOnCell, kiteIndexOnCell, edgeSignOnVertex = mesh
 
+    @inbounds for iCell in 1:nCells, i in 1:nEdgesOnCell[iCell]
+        
+        iEdge = edgesOnCell[i, iCell]
+        iVertex = verticesOnCell[i, iCell]
 
-    @inbounds for iCell in 1:nCells
-       @inbounds for i in 1:nEdgesOnCell[iCell]
-            iEdge = edgesOnCell[i, iCell]
-            # vector points to from cell 1 to cell 2 
-            edgeSignOnCell[i, iCell] = (iCell == cellsOnEdge[1, iEdge]) ? -1 : 1
-            
-            iVertex = verticesOnCell[i, iCell]
-            @inbounds for j in 1:vertexDegree
-                kiteIndexOnCell[i, iCell] = cellsOnVertex[j,iVertex] == iCell && (j)
+        # vector points to from cell 1 to cell 2 
+        if iCell == cellsOnEdge[1, iEdge]
+            edgeSignOnCell[i, iCell] = -1
+        else 
+            edgeSignOnCell[i, iCell] = 1
+        end 
+
+        @inbounds for j in 1:vertexDegree
+            if cellsOnVertex[j,iVertex] == iCell
+                kiteIndexOnCell[i, iCell] = j 
             end 
         end 
     end 
 
-
-    @inbounds for iVertex in 1:nVertices
-        @inbounds for i in 1:vertexDegree 
-            iEdge = edgesOnVertex[i, iVertex]
-            # Vector points from vertex 1 to vertex 2 
-            if iVertex == verticesOnEdge[1, iEdge]
-                edgeSignOnVertex[i, iVertex] = -1 
-            else 
-                edgeSignOnVertex[i, iVertex] = 1 
-            end
-            #edgeSignOnVertex[i, iVertex] = (iVertex == verticesOnEdge[1,iEdge]) ? -1 : 1
-        end 
+    @inbounds for iVertex in 1:nVertices, i in 1:vertexDegree 
+        iEdge = edgesOnVertex[i, iVertex]
+         
+        # Vector points from vertex 1 to vertex 2 
+        if iVertex == verticesOnEdge[1, iEdge]
+            edgeSignOnVertex[i, iVertex] = -1 
+        else 
+            edgeSignOnVertex[i, iVertex] = 1 
+        end
     end 
-
-    # Doesn't work because we have an immutable strucutre, even though the fields themselevs 
-    # are mutable 
-    #@pack! mesh = edgeSignOnCell, kiteIndexOnCell, edgeSignOnVertex
     
+    # repack the signed fields into the mesh structure. 
     mesh.edgeSignOnCell .= edgeSignOnCell 
     mesh.kiteIndexOnCell .= kiteIndexOnCell 
     mesh.edgeSignOnVertex .= edgeSignOnVertex
 end 
 
+function meshMinMaxLevel!(mesh::Mesh)
+    
+    @unpack nEdges, nVertices, vertexDegree = mesh
+    @unpack cellsOnEdge, cellsOnVertex, maxLevelCell = mesh 
+    @unpack maxLevelEdgeTop, maxLevelEdgeBot = mesh 
+    @unpack maxLevelVertexBot, maxLevelVertexTop = mesh 
+
+    # Mesh structure does not have `maxLevel...` variables initialized 
+    # So they aren't set here, but may need to be in the future. 
+    
+    #= Performance Note: 
+        maxLevel loop itterate over the same indexes and are not dependent 
+        on eachother. Therefore loops can be combined, unclear if there would 
+        be a significant to warrant the hit to code readability. 
+    
+    =#
+
+    # maxLevelEdgeTop is the minimum (shallowest) of surrounding cells
+    @inbounds for iEdge in 1:nEdges
+        iCell1 = cellsOnEdge[1,iEdge]
+        iCell2 = cellsOnEdge[1,iEdge]
+        maxLevelEdgeTop[iEdge] = min(maxLevelCell[iCell1], maxLevelCell[iCell2])
+    end 
+    #maxLevelEdgeTop[nEdges+1] = 0
+
+    # maxLevelEdgeBot is the maximum (deepest) of surrounding cells
+    @inbounds for iEdge in 1:nEdges
+        iCell1 = cellsOnEdge[1,iEdge]
+        iCell2 = cellsOnEdge[1,iEdge]
+        maxLevelEdgeBot[iEdge] = max(maxLevelCell[iCell1], maxLevelCell[iCell2])
+    end 
+    #maxLevelEdgeBot[nEdges+1] = 0
+    
+    # maxLevelVertexBot is the maximum (deepest) of surrounding cells
+    @inbounds for iVertex in 1:nVertices
+        maxLevelVertexBot[iVertex] = maxLevelCell[cellsOnVertex[1,iVertex]]
+        for i in 2:vertexDegree
+            iCell = cellsOnVertex[i,iVertex]
+            maxLevelVertexBot[iVertex] = max(maxLevelVertexBot[iVertex], 
+                                             maxLevelCell[iCell])
+        end 
+    end 
+    #maxLevelVertexBot[nVertices+1] = 0
+
+    # maxLevelVertexTop is the minimum (shallowest) of surrounding cells
+    @inbounds for iVertex in 1:nVertices
+        maxLevelVertexTop[iVertex] = maxLevelCell[cellsOnVertex[1,iVertex]]
+        for i in 2:vertexDegree
+            iCell = cellsOnVertex[i,iVertex]
+            maxLevelVertexTop[iVertex] = min(maxLevelVertexTop[iVertex], 
+                                             maxLevelCell[iCell])
+        end 
+    end 
+    #maxLevelVertexTop[nVertices+1] = 0
+    
+    mesh.maxLevelEdgeTop .= maxLevelEdgeTop
+    mesh.maxLevelEdgeBot .= maxLevelEdgeBot
+    mesh.maxLevelVertexTop .= maxLevelVertexTop
+    mesh.maxLevelVertexBot .= maxLevelVertexBot
+end 
+
+
+function meshMarkBoundaries!(mesh::Mesh)
+
+
+end

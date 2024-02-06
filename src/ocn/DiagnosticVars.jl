@@ -96,6 +96,7 @@ function calculate_layerThicknessEdge!(Mesh::Mesh,
         cell1Index = cellsOnEdge[1,iEdge]
         cell2Index = cellsOnEdge[2,iEdge]
 
+        #      minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
         @fastmath for k in 1:maxLevelEdgeTop[iEdge]
             layerThicknessEdge[k,iEdge] = 0.5 * (layerThickness[k,cell1Index] +
                                                  layerThickness[k, cell2Index])

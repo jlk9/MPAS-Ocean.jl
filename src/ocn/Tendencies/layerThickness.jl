@@ -5,7 +5,9 @@ function computeLayerThicknessTendency!(Mesh::Mesh,
                                         #:LayerThickness)
 
      
-    @unpack normalVelocity = Prog 
+    #@unpack normalVelocity = Prog 
+    normalVelocity = Prog.normalVelocity[:,:,end]
+
     @unpack layerThicknessEdge = Diag
     #@unpack layerThicknessEdge, vertAleTransportTop = Diag
     @unpack tendLayerThickness = Tend 
@@ -16,8 +18,8 @@ function computeLayerThicknessTendency!(Mesh::Mesh,
     # NOTE: Forcing would be applied here
 
     horizontal_advection_tendency!(Mesh,
-                                   normalVelocity[:,:,1],
-                                   layerThicknessEdge[:,:,1],
+                                   normalVelocity,
+                                   layerThicknessEdge,
                                    tendLayerThickness)
     #=
     vertical_advection_tendency!(Mesh::Mesh,
@@ -35,15 +37,15 @@ function horizontal_advection_tendency!(Mesh::Mesh,
     
     @unpack nCells, nEdgesOnCell = Mesh
     @unpack edgesOnCell, edgeSignOnCell = Mesh  
-    @unpack dvEdge, areaCell, maxLevelCell = Mesh 
+    @unpack dvEdge, areaCell, maxLevelEdgeTop = Mesh 
     
-    @fastmath for iCell in nCells, i in 1:nEdgesOnCell[iCell]
+    @fastmath for iCell in 1:nCells, i in 1:nEdgesOnCell[iCell]
         iEdge = edgesOnCell[i,iCell]
         invAreaCell = 1.0 / areaCell[iCell] # type stable? 
 
         # TODO: this should be from:
         #      minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
-        @fastmath for k in 1:maxLevelCell[iCell]
+        @fastmath for k in 1:maxLevelEdgeTop[iEdge]
             
             # TODO: flux calculation should use `layerThicknessEdgeFlux`
             #       to allow for upwinding and linearization 

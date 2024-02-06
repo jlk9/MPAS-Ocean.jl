@@ -4,7 +4,7 @@ function computeNormalVelocityTendency!(Mesh::Mesh,
                                         Tend::TendencyVars)
                                         #:normalVelocity)
     
-    @unpack ssh, normalVelocity = Prog
+    @unpack ssh, normalVelocity, layerThickness = Prog
     @unpack tendNormalVelocity = Tend 
     
 
@@ -13,8 +13,9 @@ function computeNormalVelocityTendency!(Mesh::Mesh,
     
     # NOTE: Forcing would be applied here
 
-    pressure_gradient_tendency!(Mesh, 
-                                ssh[:,1], 
+    pressure_gradient_tendency!(Mesh,
+                                layerThickness[:,:,1], 
+                                #ssh[:,1], 
                                 tendNormalVelocity)
     
     coriolis_force_tendency!(Mesh, 
@@ -40,7 +41,7 @@ function pressure_gradient_tendency!(Mesh::Mesh,
         iCell2 = cellsOnEdge[2,iEdge]
 
         @fastmath for k in 1:maxLevelEdgeTop[iEdge]
-            tendNormalVelocity[k,iEdge] += 9.81 * 
+            tendNormalVelocity[k,iEdge] += 9.80616 * 
                                            (ssh[iCell1] - ssh[iCell2]) / dcEdge[iEdge] 
         end 
     end
@@ -64,7 +65,7 @@ function coriolis_force_tendency!(Mesh::Mesh,
 
         @fastmath for k in 1:maxLevelEdgeTop[iEdge]
             tendNormalVelocity[k,iEdge] += weightsOnEdge[i,iEdge] *
-                                           normalVelocity[i,iEdge] *
+                                           normalVelocity[k, eoe] *
                                            fEdge[eoe]
         end
     end
