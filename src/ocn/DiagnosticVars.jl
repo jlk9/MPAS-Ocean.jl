@@ -3,6 +3,12 @@ mutable struct DiagnosticVars{F}
     # var: layer thickness averaged from cell centers to edges [m]
     # dim: (nVertLevels, nEdges) Time?)
     layerThicknessEdge::Array{F,2}
+    
+    # NOTE: layerThickness is not a diagnostic variable, but it placed 
+    #       here since we need to read it from a file and that's convinent 
+    # var: Layer thickness when the ocean is at rest [m]
+    # dim: (nVertLevels, nCells)
+    restingThickness::Array{F,2}
 
     #= Performance Note: 
     # ###########################################################
@@ -36,9 +42,15 @@ mutable struct DiagnosticVars{F}
     =# 
 end 
  
-function DiagnosticVars_init(Config::GlobalConfig, Mesh::Mesh) 
+function DiagnosticVars_init(config::GlobalConfig, Mesh::Mesh) 
     
     @unpack nVertLevels, nCells, nEdges= Mesh
+
+
+    inputConfig = ConfigGet(config.streams, "input")
+    input_filename = ConfigGet(inputConfig, "filename_template")
+
+    input = NCDataset(input_filename)
 
     # Here in the init function is where some sifting through will 
     # need to be done, such that only diagnostic variables required by 
@@ -48,7 +60,12 @@ function DiagnosticVars_init(Config::GlobalConfig, Mesh::Mesh)
     #gradSSH = zeros(Float64, nEdges)
     layerThicknessEdge = zeros(Float64, nVertLevels, nEdges) 
     
-    DiagnosticVars{Float64}(layerThicknessEdge)
+    restingThickness = zeros(Float64, nVertLevels, nCells)
+    # TO DO: Put into the diagnsotic and/or vertical grid struct 
+    restingThickness[:,:] = input["restingThickness"][:,:,1]
+
+    DiagnosticVars{Float64}(layerThicknessEdge, 
+                            restingThickness)
 end 
 
 function diagnostic_compute!(Mesh::Mesh, Diag::DiagnosticVars, Prog::PrognosticVars)
@@ -87,7 +104,9 @@ function calculate_layerThicknessEdge!(Mesh::Mesh,
                                        Diag::DiagnosticVars,
                                        Prog::PrognosticVars)
     
-    @unpack layerThickness = Prog 
+    #layerThickness = @view Prog.layerThickness[:,:,end]
+    layerThickness = Prog.layerThickness[:,:,end]
+        
     @unpack layerThicknessEdge = Diag 
     @unpack nEdges, cellsOnEdge, maxLevelEdgeTop = Mesh
 
@@ -96,10 +115,9 @@ function calculate_layerThicknessEdge!(Mesh::Mesh,
         cell1Index = cellsOnEdge[1,iEdge]
         cell2Index = cellsOnEdge[2,iEdge]
 
-        #      minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
         @fastmath for k in 1:maxLevelEdgeTop[iEdge]
             layerThicknessEdge[k,iEdge] = 0.5 * (layerThickness[k,cell1Index] +
-                                                 layerThickness[k, cell2Index])
+                                                 layerThickness[k,cell2Index])
         end 
     end 
 

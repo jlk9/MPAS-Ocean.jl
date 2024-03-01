@@ -4,22 +4,30 @@ function computeNormalVelocityTendency!(Mesh::Mesh,
                                         Tend::TendencyVars)
                                         #:normalVelocity)
     
-    @unpack ssh, normalVelocity, layerThickness = Prog
+    # layerThickness should be replaced by ssh in the future
+    # Given that the mesh is unstrcutred,is memory access random 
+    # enough that making a copy of the array is better than a view?
+    # https://docs.julialang.org/en/v1/manual/performance-tips/#Copying-data-is-not-always-bad
+    #layerThickness = @view Prog.layerThickness[1,:,end]
+    #normalVelocity = @view Prog.normalVelocity[:,:,end]
+    
+    ssh = Prog.ssh[:,end]
+    #layerThickness = Prog.layerThickness[:,:,end]
+    normalVelocity = Prog.normalVelocity[:,:,end]
+    
     @unpack tendNormalVelocity = Tend 
     
-
     # WARNING: this is not performant and should be fixed
     tendNormalVelocity .= 0.0
     
     # NOTE: Forcing would be applied here
 
     pressure_gradient_tendency!(Mesh,
-                                layerThickness[:,:,1], 
-                                #ssh[:,1], 
+                                ssh,
                                 tendNormalVelocity)
     
     coriolis_force_tendency!(Mesh, 
-                             normalVelocity[:,:,1], 
+                             normalVelocity,
                              tendNormalVelocity)
     
     @pack! Tend = tendNormalVelocity
@@ -41,8 +49,8 @@ function pressure_gradient_tendency!(Mesh::Mesh,
         iCell2 = cellsOnEdge[2,iEdge]
 
         @fastmath for k in 1:maxLevelEdgeTop[iEdge]
-            tendNormalVelocity[k,iEdge] += 9.80616 * 
-                                           (ssh[iCell1] - ssh[iCell2]) / dcEdge[iEdge] 
+            tendNormalVelocity[k,iEdge] += 9.80616 *
+                (ssh[iCell1] - ssh[iCell2]) / dcEdge[iEdge] 
         end 
     end
 end
@@ -52,7 +60,7 @@ function coriolis_force_tendency!(Mesh::Mesh,
                                   tendNormalVelocity)
     
     @unpack nEdges, nEdgesOnEdge = Mesh 
-    @unpack maxLevelEdgeTop, dcEdge, weightsOnEdge, fEdge = Mesh 
+    @unpack maxLevelEdgeTop, weightsOnEdge, fEdge = Mesh 
     @unpack cellsOnEdge, boundaryEdge, edgesOnEdge = Mesh 
 
     @fastmath for iEdge in 1:nEdges, i in 1:nEdgesOnEdge[iEdge]

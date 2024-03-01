@@ -15,17 +15,16 @@ function ocn_init(Config_filepath)
     # return the model setup instance
     Setup = ModelSetup(Config, Mesh, Clock)
 
-    # Diganostics should be intialized here, 
-    # this should just allocate the array, but first computation 
-    # should get done in time integration loop. 
-    Diag = DiagnosticVars_init(Config, Mesh) 
-    
-    # Tendencies are initialized here
-    Tend = TendencyVars(Config, Mesh)
-
     # Prognostics should be intialized here, 
     # add option to read from input file (i.e. mesh) or from restrart
     Prog = PrognosticVars_init(Config, Mesh)
+    
+    # Diagnostic and Tendecies probabl don't need to be initialized here 
+    # instead should happen within the `ocn_run` method, prior to entering 
+    # the first time integration loop to ensure values are initialized 
+    Diag = DiagnosticVars_init(Config, Mesh) 
+
+    Tend = TendencyVars(Config, Mesh)
 
     return Setup, Diag, Tend, Prog
 end 

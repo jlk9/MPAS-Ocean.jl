@@ -5,18 +5,17 @@ function computeLayerThicknessTendency!(Mesh::Mesh,
                                         #:LayerThickness)
 
      
-    #@unpack normalVelocity = Prog 
+    #normalVelocity = @view Prog.normalVelocity[:,:,end]
     normalVelocity = Prog.normalVelocity[:,:,end]
 
     @unpack layerThicknessEdge = Diag
-    #@unpack layerThicknessEdge, vertAleTransportTop = Diag
     @unpack tendLayerThickness = Tend 
     
     # WARNING: this is not performant and should be fixed
     tendLayerThickness .= 0.0
 
     # NOTE: Forcing would be applied here
-
+    
     horizontal_advection_tendency!(Mesh,
                                    normalVelocity,
                                    layerThicknessEdge,
@@ -39,22 +38,26 @@ function horizontal_advection_tendency!(Mesh::Mesh,
     @unpack edgesOnCell, edgeSignOnCell = Mesh  
     @unpack dvEdge, areaCell, maxLevelEdgeTop = Mesh 
     
-    @fastmath for iCell in 1:nCells, i in 1:nEdgesOnCell[iCell]
-        iEdge = edgesOnCell[i,iCell]
-        invAreaCell = 1.0 / areaCell[iCell] # type stable? 
+    #@fastmath 
+    for iCell in 1:nCells
+        for i in 1:nEdgesOnCell[iCell]
+            iEdge = edgesOnCell[i,iCell]
+            invAreaCell = 1.0 / areaCell[iCell] # type stable? 
 
-        # TODO: this should be from:
-        #      minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
-        @fastmath for k in 1:maxLevelEdgeTop[iEdge]
-            
-            # TODO: flux calculation should use `layerThicknessEdgeFlux`
-            #       to allow for upwinding and linearization 
-            flux = normalVelocity[k,iEdge] * dvEdge[iEdge] * 
-                   layerThicknessEdge[k,iEdge]  
+            # TODO: this should be from:
+            #      minLevelEdgeBot(iEdge), maxLevelEdgeTop(iEdge)
+            #@fastmath 
+            for k in 1:maxLevelEdgeTop[iEdge]
+                
+                # TODO: flux calculation should use `layerThicknessEdgeFlux`
+                #       to allow for upwinding and linearization 
+                flux = normalVelocity[k,iEdge] * dvEdge[iEdge] * 
+                       layerThicknessEdge[k,iEdge]  
 
-            tendLayerThickness[k,iCell] += edgeSignOnCell[i,iCell] *
-                                           flux * invAreaCell
-        end 
+                tendLayerThickness[k,iCell] += edgeSignOnCell[i,iCell] *
+                                               flux * invAreaCell
+            end 
+        end
     end 
 end
 

@@ -45,26 +45,24 @@ function PrognosticVars_init(config::GlobalConfig, mesh::Mesh)
     
     # Read the number of desired time levels from the config file 
     timeIntegrationConfig = ConfigGet(config.namelist, "time_integration")
-    nTimeLevels = ConfigGet(timeIntegrationConfig, "config_number_of_time_levels")
-     
-    # Hard coding nTimeLevels to 1 for now 
+    #nTimeLevels = ConfigGet(timeIntegrationConfig, "config_number_of_time_levels")
     nTimeLevels = 1
-
+     
     @unpack nVertLevels, nCells, nEdges= mesh
 
     input = NCDataset(input_filename)
 
     ssh = zeros(Float64, nCells, nTimeLevels)
     # TO DO: check that the input file only has one time level 
-    ssh[:,1] = input["ssh"][:,:]
+    ssh[:,:] .= input["ssh"][:,1]
     
     normalVelocity = zeros(Float64, nVertLevels, nEdges, nTimeLevels)
     # TO DO: check that the input file only has one time level
-    normalVelocity[:,:,1] = input["normalVelocity"][:,:,:]
+    normalVelocity[:,:,:] .= input["normalVelocity"][:,:,1]
     
     layerThickness = zeros(Float64, nVertLevels, nCells, nTimeLevels)
     # TO DO: check that the input file only has one time level 
-    layerThickness[:,:,1] = input["layerThickness"][:,:,:]
+    layerThickness[:,:,:] .= input["layerThickness"][:,:,1]
     
     # return instance of Prognostic struct 
     PrognosticVars{Float64}(ssh, normalVelocity, layerThickness)

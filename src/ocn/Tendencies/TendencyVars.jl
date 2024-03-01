@@ -59,6 +59,17 @@ function computeTendency!(Mesh::Mesh,
     end        
 end
 
+function axb!(a::Array{T,2}, x::T, b::Array{T,2}) where {T<:AbstractFloat}
+    m,n = size(a)
+
+    @boundscheck (m,n) == size(b) || throw(BoundsError())
+
+    @inbounds for j ∈ 1:n
+        for i ∈ 1:m
+           a[i,j] += x*b[i,j]
+        end
+    end
+end 
 
 # TODO: Would be good to write out some information about the shared 
 #       interface of `computeTendency!` and what is needed for it to 

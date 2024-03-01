@@ -23,6 +23,13 @@ mutable struct Clock
     end 
 end 
 
+function changeTimeStep!(clock::Clock, timestep::Period)
+    # Assign the new time step to this clock
+    clock.timeStep = timestep
+    # Update the next time based on new time step
+    clock.nextTime = clock.currTime + timestep 
+end 
+
 function attachAlarm!(clock::Clock, alarm::AbstractAlarm)
     push!(clock.alarms, alarm)
 end

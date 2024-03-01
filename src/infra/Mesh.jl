@@ -152,7 +152,7 @@ Base.@kwdef struct Mesh{dp,i1,i4}
     edgeSignOnVertex::Array{i1,2} = zeros(i4, maxEdges, nVertices)
     # Mask for determining boundary vertices. A boundary vertex has at
     # least one inactive cell neighboring it
-    # boundaryVertex::Array{i4,2} = zeros(i4, nVertLevels, nVertices)
+    #boundaryVertex::Array{i4,2} = zeros(i4, nVertLevels, nVertices)
     # Mask on vertices that determines if computations should be done on vertice
     vertexMask::Array{i4,2} = zeros(i4, nVertLevels, nVertices)
 end 
@@ -175,8 +175,8 @@ function ReadMesh(meshPath::String)
     meshSignIndexFields!(mesh)
     # compute min/max levels for edges and vertices 
     meshMinMaxLevel!(mesh) 
-
-
+    ## find boundaries 
+    #meshMarkBoundaries!(mesh)
     return mesh
 end 
 
@@ -337,6 +337,21 @@ end
 
 
 function meshMarkBoundaries!(mesh::Mesh)
+    @unpack boundaryEdge, boundaryCell, boundaryVertex = mesh
+    @unpack edgeMask, cellMask, vertexMask = mesh 
+    @unpack cellsOnEdge, verticesOnEdge = mesh 
+    @unpack nVertLevels, nCells, nEdges, nVertices = mesh
+    @unpack minLevelEdgeTop, minLevelCell, minLevel = mesh
 
+    # set boundary edge 
+    boundaryEdge[:,:] .= 1.0
+    edgeMask[:,:] .= 0.0
+    
+    for iEdge in 1:nEdges, k in 1:maxLevelEdgeTop[iEdge]
+        edgeMask[k,iEdge] = 1.0
+        boundaryEdge[k,iEdge] = 0.0
+    end 
 
+    mesh.edgeMask .= edgeMask
+    mesh.boundaryEdge .= boundaryEdge
 end
