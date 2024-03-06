@@ -1,7 +1,8 @@
 module MPAS_O
     
-    export ocn_init, isRinging, advance!, ocn_timestep, changeTimeStep!
-    export RungeKutta4, ForwardEuler, inertialGravityWave
+    export ocn_init, isRinging, advance!, ocn_timestep, changeTimeStep!, reset!
+    export RungeKutta4, ForwardEuler 
+    export write_netcdf
 
     using Dates, YAML, NCDatasets, UnPack, Statistics
     
@@ -16,12 +17,11 @@ module MPAS_O
     include("ocn/PrognosticVars.jl")
     include("ocn/DiagnosticVars.jl")
 
+    include("infra/OutPut.jl")
+
     include("ocn/Tendencies/TendencyVars.jl")
     include("ocn/Tendencies/normalVelocity.jl")
     include("ocn/Tendencies/layerThickness.jl")
-
-    # for debuggin purposes 
-    include("inertialGravityWave.jl")
 
     include("forward/init.jl")
     include("forward/time_integration.jl")

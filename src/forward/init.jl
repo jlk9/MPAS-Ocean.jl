@@ -3,8 +3,7 @@ function ocn_init(Config_filepath)
     # read the configuration file 
     Config = ConfigRead(Config_filepath)
 
-    #TO DO: Read the constants ?? 
-
+    #TO DO: Read constants ?? 
 
     # setup the mesh 
     Mesh = ocn_setup_mesh(Config)
@@ -43,6 +42,7 @@ end
 function ocn_setup_clock(Config::GlobalConfig)
 
     # Get the nested Config objects 
+    outputConfig = ConfigGet(Config.streams, "output")
     time_managementConfig = ConfigGet(Config.namelist, "time_management")
     time_integrationConfig = ConfigGet(Config.namelist, "time_integration")
     
@@ -51,6 +51,9 @@ function ocn_setup_clock(Config::GlobalConfig)
     start_time = ConfigGet(time_managementConfig, "config_start_time")
     run_duration = ConfigGet(time_managementConfig, "config_run_duration")
     restart_timestamp_name = ConfigGet(time_managementConfig, "config_restart_timestamp_name")
+    
+    output_reference_time = ConfigGet(outputConfig, "reference_time")
+    output_interval = ConfigGet(outputConfig, "output_interval")
 
     ## I think I need some example of this, becuase not immediately obvious to me how to 
     ## deal with this. Or really, what this actually would look like. 
@@ -78,9 +81,13 @@ function ocn_setup_clock(Config::GlobalConfig)
     
     # create the end of simulation alarm 
     simulationAlarm = OneTimeAlarm("simulation_end", stop_time)
-        
     # attached the simulation_end alarm to the clock 
     attachAlarm!(clock, simulationAlarm)
+
+    # create the ouput alarm
+    outputAlarm = PeriodicAlarm("outputAlarm", output_interval, output_reference_time)
+    # attach the output alarm to the clock 
+    attachAlarm!(clock, outputAlarm)
 
     return clock
 end 

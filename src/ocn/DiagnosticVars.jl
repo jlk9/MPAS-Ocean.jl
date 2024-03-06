@@ -104,8 +104,7 @@ function calculate_layerThicknessEdge!(Mesh::Mesh,
                                        Diag::DiagnosticVars,
                                        Prog::PrognosticVars)
     
-    #layerThickness = @view Prog.layerThickness[:,:,end]
-    layerThickness = Prog.layerThickness[:,:,end]
+    layerThickness = @view Prog.layerThickness[:,:,end]
         
     @unpack layerThicknessEdge = Diag 
     @unpack nEdges, cellsOnEdge, maxLevelEdgeTop = Mesh

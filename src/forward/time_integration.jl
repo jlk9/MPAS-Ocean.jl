@@ -58,20 +58,23 @@ function ocn_timestep(Prog::PrognosticVars,
     #    normalVelocityProvis = Prog.normalVelocity[:,:,end]
     #    layerThicknessProvis = Prog.layerThickness[:,:,end]
     #end 
-
+    
+    sshCurr = @view Prog.ssh[:,end-1]
     normalVelocityCurr = @view Prog.normalVelocity[:,:,end-1]
     layerThicknessCurr = @view Prog.layerThickness[:,:,end-1]
-
+    
+    sshProvis = @view Prog.ssh[:,end]
     normalVelocityProvis = @view Prog.normalVelocity[:,:,end]
     layerThicknessProvis = @view Prog.layerThickness[:,:,end]
 
     # unpack the state variable arrays 
-    @unpack normalVelocity, layerThickness = Prog
+    @unpack ssh, normalVelocity, layerThickness = Prog
 
     # this will be the t+1 timestep, i.e. it's the array the rk4 updates are 
     # accumulated into, not this is NOT a view b/c that would have the substeps 
     # being overwritten byt the accumulate step. 
     #normalVelocityNew = normalVelocity[:,:,end-1] 
+    sshNew = ssh[:,end]
     normalVelocityNew = normalVelocity[:,:,end]
     layerThicknessNew = layerThickness[:,:,end]
     
@@ -89,7 +92,8 @@ function ocn_timestep(Prog::PrognosticVars,
             
             normalVelocityProvis .= a[RK_step] .* tendNormalVelocity
             layerThicknessProvis .= a[RK_step] .* tendLayerThickness
-
+            # compute ssh from layerThickness
+            sshProvis = layerThicknessProvis .- sum(Diag.restingThickness; dims=1)
             # compute the diagnostics using the Provis State, 
             # i.e. the substage solution
             diagnostic_compute!(Mesh, Diag, Prog)
@@ -98,6 +102,7 @@ function ocn_timestep(Prog::PrognosticVars,
         # accumulate the update in the NEW time position array
         normalVelocityNew .= normalVelocityNew .+ b[RK_step] .* tendNormalVelocity
         layerThicknessNew .= layerThicknessNew .+ b[RK_step] .* tendLayerThickness
+        sshNew = layerThicknessNew .- sum(Diag.restingThickness; dims=1)
     end 
     
     # place the NEW solution in the appropriate location in the Prog arrays
@@ -105,7 +110,7 @@ function ocn_timestep(Prog::PrognosticVars,
     layerThickness[:,:,end] = layerThicknessNew
 
     # put the updated solution back in the Prog strcutre 
-    @pack! Prog = normalVelocity, layerThickness 
+    @pack! Prog = ssh, normalVelocity, layerThickness 
 
     ## compute diagnostics for new state
     diagnostic_compute!(Mesh, Diag, Prog)
@@ -115,7 +120,6 @@ function ocn_timestep(Prog::PrognosticVars,
                       Diag::DiagnosticVars,
                       Tend::TendencyVars, 
                       S::ModelSetup, 
-                      iGE::inertialGravityWave,
                       ::Type{ForwardEuler})
     
     Mesh = S.mesh 
@@ -124,7 +128,7 @@ function ocn_timestep(Prog::PrognosticVars,
     time = convert(Float64, Dates.value(Second(Clock.currTime - Clock.startTime)))
 
     # advance the timelevels within the state strcut 
-    #advanceTimeLevels!(Prog)
+    advanceTimeLevels!(Prog)
 
     # convert the timestep to seconds 
     dt = convert(Float64, Dates.value(Second(Clock.timeStep)))
@@ -137,11 +141,9 @@ function ocn_timestep(Prog::PrognosticVars,
 
     # compute normalVelocity tenedency 
     computeTendency!(Mesh, Diag, Prog, Tend, :normalVelocity)
-    #tendNormalVelocity = Tend.tendNormalVelocity
 
     # compute layerThickness tendency 
     computeLayerThicknessTendency!(Mesh, Diag, Prog, Tend)
-    #tendLayerThickness = Tend.tendLayerThickness
     
     # unpack the tendency variable arrays 
     @unpack tendNormalVelocity, tendLayerThickness = Tend 

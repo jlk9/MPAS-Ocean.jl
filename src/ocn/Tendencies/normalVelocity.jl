@@ -2,18 +2,13 @@ function computeNormalVelocityTendency!(Mesh::Mesh,
                                         Diag::DiagnosticVars, 
                                         Prog::PrognosticVars,
                                         Tend::TendencyVars)
-                                        #:normalVelocity)
     
-    # layerThickness should be replaced by ssh in the future
     # Given that the mesh is unstrcutred,is memory access random 
     # enough that making a copy of the array is better than a view?
     # https://docs.julialang.org/en/v1/manual/performance-tips/#Copying-data-is-not-always-bad
-    #layerThickness = @view Prog.layerThickness[1,:,end]
-    #normalVelocity = @view Prog.normalVelocity[:,:,end]
+    ssh = @view Prog.ssh[:,end]
+    normalVelocity = @view Prog.normalVelocity[:,:,end]
     
-    ssh = Prog.ssh[:,end]
-    #layerThickness = Prog.layerThickness[:,:,end]
-    normalVelocity = Prog.normalVelocity[:,:,end]
     
     @unpack tendNormalVelocity = Tend 
     

@@ -38,11 +38,9 @@ function TendencyVars(Config::GlobalConfig, Mesh::Mesh)
 
     tendNormalVelocity = zeros(Float64, nVertLevels, nEdges) 
     tendLayerThickness = zeros(Float64, nVertLevels, nCells)
-    #tendSSH = zeros(Float64, nCells)
 
     TendencyVars{Float64}(tendNormalVelocity, 
                           tendLayerThickness) 
-                          #tendSSH)
 end 
 
 

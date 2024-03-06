@@ -45,8 +45,7 @@ function PrognosticVars_init(config::GlobalConfig, mesh::Mesh)
     
     # Read the number of desired time levels from the config file 
     timeIntegrationConfig = ConfigGet(config.namelist, "time_integration")
-    #nTimeLevels = ConfigGet(timeIntegrationConfig, "config_number_of_time_levels")
-    nTimeLevels = 1
+    nTimeLevels = ConfigGet(timeIntegrationConfig, "config_number_of_time_levels")
      
     @unpack nVertLevels, nCells, nEdges= mesh
 
