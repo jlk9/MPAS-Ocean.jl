@@ -1,4 +1,5 @@
-# MPAS Ocean in Julia
+# :coffee: `Moka.jl`: MPAS Ocean (using) kernel abstractions 
+
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7493065.svg)](https://doi.org/10.5281/zenodo.7493065)
 
 An ocean model capable of running on irregular, non-rectilinear, TRiSK-based meshes. Inspired by MPAS-Ocean in Fortran.
