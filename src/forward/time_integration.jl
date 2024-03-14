@@ -41,7 +41,7 @@ function ocn_timestep(Prog::PrognosticVars,
     advanceTimeLevels!(Prog)
 
     # convert the timestep to seconds 
-    dt = Dates.value(Second(Clock.timeStep))
+    dt = convert(Float64, Dates.value(Second(Clock.timeStep)))
     
     a = [dt/2., dt/2., dt]
     b = [dt/6., dt/3., dt/3., dt/6.]
@@ -90,8 +90,8 @@ function ocn_timestep(Prog::PrognosticVars,
         # of the Prog structure 
         if RK_step < 4
             
-            normalVelocityProvis .= a[RK_step] .* tendNormalVelocity
-            layerThicknessProvis .= a[RK_step] .* tendLayerThickness
+            normalVelocityProvis .= normalVelocityCurr .+ a[RK_step] .* tendNormalVelocity
+            layerThicknessProvis .= layerThicknessCurr .+ a[RK_step] .* tendLayerThickness
             # compute ssh from layerThickness
             sshProvis = layerThicknessProvis .- sum(Diag.restingThickness; dims=1)
             # compute the diagnostics using the Provis State, 

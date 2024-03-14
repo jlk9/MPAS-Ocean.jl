@@ -15,7 +15,7 @@ function ocn_run(config_fp)
     
     # this is hardcoded for now, but should really be set accordingly in the 
     # yaml file
-    #dt = floor(0.5 * mean(mesh.dcEdge) / 1e3)
+    #dt = floor(3.0 * mean(mesh.dcEdge) / 1e3)
     dt = floor(2 * (mean(mesh.dcEdge) / 1e3) * mean(mesh.dcEdge) / 200e3) 
     changeTimeStep!(Setup.timeManager, Second(dt))
     

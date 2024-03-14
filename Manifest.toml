@@ -2,7 +2,7 @@
 
 julia_version = "1.9.4"
 manifest_format = "2.0"
-project_hash = "5c1ec8be5384488f079bc2277d9f2b262fd8f867"
+project_hash = "47782c57e810b71c569faf404da5d0c9f697590c"
 
 [[deps.AbstractFFTs]]
 deps = ["ChainRulesCore", "LinearAlgebra"]
@@ -60,6 +60,12 @@ version = "7.7.0"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
+
+[[deps.Atomix]]
+deps = ["UnsafeAtomics"]
+git-tree-sha1 = "c06a868224ecba914baa6942988e2f2aade419be"
+uuid = "a9b6321e-bd34-4604-b9c9-b65b8de01458"
+version = "0.1.0"
 
 [[deps.Automa]]
 deps = ["PrecompileTools", "TranscodingStreams"]
@@ -847,6 +853,18 @@ deps = ["CodeTracking", "InteractiveUtils", "Random", "UUIDs"]
 git-tree-sha1 = "7b762d81887160169ddfc93a47e5fd7a6a3e78ef"
 uuid = "aa1ae85d-cabe-5617-a682-6adf51b2e16a"
 version = "0.9.29"
+
+[[deps.KernelAbstractions]]
+deps = ["Adapt", "Atomix", "InteractiveUtils", "LinearAlgebra", "MacroTools", "PrecompileTools", "Requires", "SparseArrays", "StaticArrays", "UUIDs", "UnsafeAtomics", "UnsafeAtomicsLLVM"]
+git-tree-sha1 = "ed7167240f40e62d97c1f5f7735dea6de3cc5c49"
+uuid = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+version = "0.9.18"
+
+    [deps.KernelAbstractions.extensions]
+    EnzymeExt = "EnzymeCore"
+
+    [deps.KernelAbstractions.weakdeps]
+    EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
 
 [[deps.KernelDensity]]
 deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
@@ -1883,6 +1901,17 @@ deps = ["LaTeXStrings", "Latexify", "Unitful"]
 git-tree-sha1 = "e2d817cc500e960fdbafcf988ac8436ba3208bfd"
 uuid = "45397f5d-5981-4c77-b2b3-fc36d6e9b728"
 version = "1.6.3"
+
+[[deps.UnsafeAtomics]]
+git-tree-sha1 = "6331ac3440856ea1988316b46045303bef658278"
+uuid = "013be700-e6cd-48c3-b4a1-df204f14c38f"
+version = "0.2.1"
+
+[[deps.UnsafeAtomicsLLVM]]
+deps = ["LLVM", "UnsafeAtomics"]
+git-tree-sha1 = "ead6292c02aab389cb29fe64cc9375765ab1e219"
+uuid = "d80eeb9a-aca5-4d75-85e5-170c8b632249"
+version = "0.1.1"
 
 [[deps.Unzip]]
 git-tree-sha1 = "ca0969166a028236229f63514992fc073799bb78"

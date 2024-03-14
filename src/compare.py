@@ -270,7 +270,7 @@ with open("../bare_minimum.yml",'r') as f:
 
 
 mesh_fp = streams['mesh']['filename_template']
-output_fp = "test.nc"
+output_fp = "output.nc"
 #output_fp = "/pscratch/sd/a/anolan/inertial_gravity_wave/ocean/planar/inertial_gravity_wave/forward/100km/output.nc"
 
 # load numerical results, compute analytical, and compare
