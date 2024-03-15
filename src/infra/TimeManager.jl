@@ -10,18 +10,34 @@ mutable struct Clock
     nextTime::DateTime
     timeStep::Period
 
-    alarms::Vector{AbstractAlarm}
+    alarms::Dict{String, AbstractAlarm}
 
     # How does it know the stop time? Is that set as an alarm? 
     function Clock(startTime::DateTime, timeStep::Period)
         currTime = startTime 
-        prevTime = nothing # at the start of the sim. there has been no prev. time 
+        # at initialization there has been no prev. time 
+        prevTime = nothing
+        # could follow the CANGA approach; might be helpfull w/ restarts
+        #prevTime = currTime - timeStep
         nextTime = currTime + timeStep
-        
+        # create an empty dictionary of alarms
+        alarms = Dict{String, AbstractAlarm}()
+         
         # return an instance of our structure 
-        return new(startTime, currTime, prevTime, nextTime, timeStep, AbstractAlarm[])
+        return new(startTime, currTime, prevTime, nextTime, timeStep, alarms)
     end 
 end 
+
+function setCurrentTime!(clock::Clock, inCurrTime::DateTime)
+    # Check that new value doesn't precede start time 
+    if inCurrTime < clock.startTime
+        @error "Value of current time precedes start time" 
+    else 
+        clock.currTime = inCurrTime
+        clock.prevTime = inCurrTime - clock.timeStep
+        clock.nextTime = inCurrTime + clock.timeStep
+    end
+end
 
 function changeTimeStep!(clock::Clock, timestep::Period)
     # Assign the new time step to this clock
@@ -31,7 +47,8 @@ function changeTimeStep!(clock::Clock, timestep::Period)
 end 
 
 function attachAlarm!(clock::Clock, alarm::AbstractAlarm)
-    push!(clock.alarms, alarm)
+    # use the alarms name to insert it in the dict of alarms
+    clock.alarms[alarm.name] = alarm
 end
 
 function advance!(clock::Clock)
@@ -39,9 +56,9 @@ function advance!(clock::Clock)
     clock.prevTime = clock.currTime
     clock.currTime = clock.nextTime 
     clock.nextTime = clock.currTime + clock.timeStep
-
-    # Update status of any attached alarms (via broadcasting)
-    updateStatus!.(clock.alarms, clock.currTime)
+    # Update status of any attached alarms via broadcasting
+    # across the values of the alarms dictionary
+    updateStatus!.(values(clock.alarms), clock.currTime)
 end 
 
 
@@ -89,6 +106,10 @@ mutable struct PeriodicAlarm{S,B,DT,P} <: AbstractAlarm
     end
 end
 
+# 
+Alarm(name::String, alarmTime::DateTime) = OneTimeAlarm(name, alarmTime)
+Alarm(name::String, alarmInterval::Period, intervalStart::DateTime) = 
+    PeriodicAlarm(name, alarmInterval, intervalStart)
 
 # Methods that work for all types of alarms 
 function isRinging(alarm::AbstractAlarm)
@@ -107,27 +128,39 @@ function stop!(alarm::AbstractAlarm)
     alarm.ringing = false 
 end
 
-
 # Methods that have type specific behavior 
-function reset!(alarm::OneTimeAlarm; inTime::Union{Nothing, DateTime}=nothing)
+function reset!(alarm::OneTimeAlarm)
     stop!(alarm)
-
-    if !isnothing(inTime)
-        alarm.ringTime = inTime
-    else 
-        alarm.stopped = true 
-    end 
+    alarm.stopped = true 
 end
 
-# NOTE: Should reset method for PeriodicAlarms accepct a new ringTime?? 
+function reset!(alarm::OneTimeAlarm, inTime::DateTime)
+    stop!(alarm)
+    alarm.ringTime = inTime 
+end
+
 function reset!(alarm::PeriodicAlarm)
     stop!(alarm)
-
     # store the ringtime just turned off as the pervious ringtime
     alarm.ringTimePrev = alarm.ringTime
     # set the next ringTime
     alarm.ringTime = alarm.ringTimePrev + alarm.ringInterval
 end 
+
+function reset!(alarm::PeriodicAlarm, inTime::DateTime)
+    stop!(alarm)
+
+    # check that the input time is valid 
+    if inTime < alarm.ringTime
+        @error "input time less than the current ring time"
+    else
+        # increment until next ringtime is greater than input time
+        while alarm.ringTime <= inTime 
+            alarm.ringTimePrev = alarm.ringTime
+            alarm.ringTime = alarm.ringTimePrev + alarm.ringInterval
+        end
+    end
+end
 
 function mpas_create_clock(timeStep, startTime; stopTime=nothing, runDuration=nothing)
     

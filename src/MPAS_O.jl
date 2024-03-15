@@ -4,7 +4,7 @@ module MPAS_O
     export RungeKutta4, ForwardEuler 
     export write_netcdf
 
-    using Dates, YAML, NCDatasets, UnPack, Statistics
+    using Dates, YAML, NCDatasets, UnPack, Statistics, Logging
     
     
     # include infrastrcutre code 
