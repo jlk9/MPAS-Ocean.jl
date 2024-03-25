@@ -61,6 +61,14 @@ function advance!(clock::Clock)
     updateStatus!.(values(clock.alarms), clock.currTime)
 end 
 
+Base.show(io::IO, clock::Clock) = 
+    print(io, "Simulation Clock with $(length(clock.alarms)) Alarms attached\n",
+          "├── Start Time   : $(clock.startTime)\n",
+          "├── Current Time : $(clock.currTime)\n",
+          "├── Previous Time: $(clock.prevTime)\n",
+          "├── Next Time    : $(clock.nextTime)\n",
+          "└── Timestep     : $(clock.timeStep)")
+
 
 # create new abstract struct similar to alarms, which contains infromation
 # about what to do when the alarm is ringing. Then a single function 
