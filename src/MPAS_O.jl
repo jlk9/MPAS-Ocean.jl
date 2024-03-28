@@ -14,6 +14,8 @@ module MPAS_O
     include("infra/TimeManager.jl")
     include("infra/ModelSetup.jl")
 
+
+    include("ocn/Operators.jl")
     include("ocn/PrognosticVars.jl")
     include("ocn/DiagnosticVars.jl")
 
