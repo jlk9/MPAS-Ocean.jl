@@ -3,9 +3,10 @@ using StructArrays
 
 
 # Mesh strucutre comprised of the 
-struct Mesh{PCT, DCT}
+struct Mesh{PCT, DCT, EST}
     PC::StructArray{PCT}
     DC::StructArray{DCT}
+    E::StructArray{EST}
 end
 
 # dimensions of the mesh 
@@ -115,8 +116,33 @@ function readDualMesh(ds)
     StructArray{Dᵢ}((xᵛ = xᵛ, yᵛ = yᵛ, EoV = EoV, CoV = CoV, AT=AT))
 end 
 
+function readEdgeInfo(ds)
+
+    # coordinate data 
+    xᵉ = ds["xEdge"][:]
+    yᵉ = ds["yEdge"][:]
+
+    # intra connectivity
+    CoE = stack(ds["cellsOnEdge"], ds.dim["nEdges"])
+    VoE = stack(ds["verticesOnEdge"], ds.dim["nEdges"])
+
+    # inter connectivity
+    EoE = stack(ds["edgesOnEdge"], ds.dim["nEdges"])
+    WoE = stack(ds["weightsOnEdge"], ds.dim["nEdges"])
+
+    lₑ = ds["dvEdge"][:]
+    dₑ = ds["dcEdge"][:]
+
+        
+    StructArray{edge}(xᵉ = xᵉ, yᵉ = yᵉ,
+                      CoE = CoE, VoE = VoE, EoE = EoE, WoE = WoE,
+                      lₑ = lₑ, dₑ = dₑ)
+end
+
 ds = NCDataset("../../test/MokaMesh.nc")
 
 PrimaryMesh = readPrimaryMesh(ds)
 DualMesh    = readDualMesh(ds)
+edges       = readEdgeInfo(ds)
 
+mesh = Mesh(PrimaryMesh, DualMesh, edges)
