@@ -58,7 +58,7 @@ end
 
     # gradient on edges calculation 
     GradEdge[iEdge] = InvDcEdge * 
-                      (ScalarCell[jCell1] - ScalarCell[jCell2])
+                      (ScalarCell[jCell2] - ScalarCell[jCell1])
 end
 
 

@@ -121,10 +121,21 @@ function ∇hₑ(test::TestSetup, ::Type{TC}) where {TC <: TestCase}
     @unpack EdgeNormalX, EdgeNormalY = test
 
     # need intermediate values from broadcasting to work correctly
-    ∂hᵢ∂x = h∂x(test, TC)
-    ∂hᵢ∂y = h∂y(test, TC)
+    ∂hᵢ∂x = ∂h∂x(test, TC)
+    ∂hᵢ∂y = ∂h∂y(test, TC)
 
     return @. EdgeNormalX * ∂hᵢ∂x + EdgeNormalY * ∂hᵢ∂y
+end
+
+function gradient!(grad, hᵢ, mesh::Mesh)
+    
+    @unpack cellsOnEdge, dcEdge, nEdges = mesh 
+    
+    backend = KA.get_backend(grad)
+    kernel! = GradientOnEdge(backend)
+    kernel!(cellsOnEdge, dcEdge, hᵢ, grad, ndrange=nEdges)
+
+    KA.synchronize(backend)
 end
 
 function divergence!(div, 𝐅ₑ, mesh::Mesh)
@@ -138,23 +149,54 @@ function divergence!(div, 𝐅ₑ, mesh::Mesh)
 
     KA.synchronize(backend)
 end
+
 lcrc_url="https://web.lcrc.anl.gov/public/e3sm/mpas_standalonedata/mpas-ocean/"
 mesh_fp ="mesh_database/doubly_periodic_5km_50x230km_planar.151218.nc" 
 
 mesh_url = lcrc_url * mesh_fp
 mesh_fn  = "MokaMesh.nc"
 
-Downloads.download(mesh_url, mesh_fn)
+#Downloads.download(mesh_url, mesh_fn)
 
 mesh = ReadMesh(mesh_fn)
 
 setup = TestSetup(mesh, PlanarTest)
 
+###
+### Gradient Test
+###
+
+# Scalar field define at cell centers
+Scalar  = h(setup, PlanarTest)
+
+gradNum = zeros(mesh.nEdges)
+gradAnn = ∇hₑ(setup, PlanarTest)
+gradient!(gradNum, Scalar, mesh)
+gradNorm = norm(gradAnn .- gradNum, Inf) / norm(gradNum, Inf)
+
+###
+### Divergence Test
+###
+
+# Edge normal component of vector value field defined at cell edges
 VecEdge = 𝐅ₑ(setup, PlanarTest)
 
 divNum = zeros(mesh.nCells)
-divergence!(divNum, VecEdge, mesh)
-
 divAnn = div𝐅(setup, PlanarTest)
+divergence!(divNum, VecEdge, mesh)
+divNorm = norm(divAnn .- divNum, Inf) / norm(divNum, Inf) 
 
-println(norm(divAnn .- divNum, Inf) / norm(divNum, Inf))
+###
+### Results Display
+###
+
+println("\n" * "="^40)
+println("Kernel Abstraction Operator Tests")
+println("="^40 * "\n")
+println("L∞ norm of Graident  : $gradNorm")
+println("L∞ norm of Divergence: $divNorm")
+print("\n" * "="^40 * "\n")
+
+
+
+
