@@ -1,5 +1,8 @@
+using CUDA
 using NCDatasets
 using StructArrays
+
+import Adapt
 
 
 # Mesh strucutre comprised of the 
@@ -22,20 +25,22 @@ end
 ###
 
 # this is a line segment
-struct edge{F, FV, IV} #where {F<:AbstractFloat, FV<:AbstractVector{AbstractFloat}, IV<:AbstractVector{Int}}
-    xᵉ::F   # X coordinate of edge midpoints in cartesian space
-    yᵉ::F   # Y coordinate of edge midpoints in cartesian space
+struct edge{FT, IT, TWO, ME2} 
+    # FT-->(F)loat (T)ype; IT-->(I)int (T)ype; TWO --> (2); ME2-->(M)ax (E)dges * (2) 
+
+    xᵉ::FT   # X coordinate of edge midpoints in cartesian space
+    yᵉ::FT   # Y coordinate of edge midpoints in cartesian space
    
     # intra edge connectivity
-    CoE::IV # (C)ells    (o)n (E)dge
-    VoE::IV # (V)ertices (o)n (E)dge
+    CoE::NTuple{TWO, IT} # (C)ells    (o)n (E)dge
+    VoE::NTuple{TWO, IT} # (V)ertices (o)n (E)dge
 
     # inter edge connectivity
-    EoE::IV # (E)dges    (o)n (E)dge
-    WoE::FV # (W)eights  (o)n (E)dge; reconstruction weights associated w/ EoE
+    EoE::NTuple{ME2, IT} # (E)dges    (o)n (E)dge
+    WoE::NTuple{ME2, FT} # (W)eights  (o)n (E)dge; reconstruction weights associated w/ EoE
 
-    lₑ::F
-    dₑ::F 
+    lₑ::FT
+    dₑ::FT 
 end
 
 ###
@@ -43,41 +48,44 @@ end
 ###
 
 # (P)rimary mesh cell
-struct Pᵢ{F, I, IV} #where {F <: AbstractFloat, I <: Int, IV <: AbstractVector{Int}}
-    xᶜ::F   # X coordinate of cell centers in cartesian space
-    yᶜ::F   # Y coordinate of cell centers in cartesian space
+struct Pᵢ{FT, IT, ME} 
+    # FT-->(F)loat (T)ype; IT-->(I)int (T)ype; ME-->(M)ax (E)dges
     
-    nEoC::I # (n)umber of (E)dges (o)n (C)ell 
+    xᶜ::FT   # X coordinate of cell centers in cartesian space
+    yᶜ::FT   # Y coordinate of cell centers in cartesian space
+    
+    nEoC::IT # (n)umber of (E)dges (o)n (C)ell 
 
     # intra cell connectivity
-    EoC::IV # (E)dges    (o)n (C)ell; set of edges that define the boundary $P_i$
-    VoC::IV # (V)ertices (o)n (C)ell
+    EoC::NTuple{ME, IT} # (E)dges    (o)n (C)ell; set of edges that define the boundary $P_i$
+    VoC::NTuple{ME, IT} # (V)ertices (o)n (C)ell
 
     # inter cell connectivity
-    CoC::IV # (C)ells    (o)n (C)ell
-    #ESoC::FV # (E)dge (S)ign (o)n (C)ell; 
+    CoC::NTuple{ME, IT} # (C)ells    (o)n (C)ell
+    #ESoC::NTuple{ME, FT} # (E)dge (S)ign (o)n (C)ell; 
 
     # area of cell 
-    AC::F 
+    AC::FT
 end
 
 # (D)ual mesh cell
-struct Dᵢ{F, FV <: AbstractVector}
-    # 
-    xᵛ::F 
-    yᵛ::F 
+struct Dᵢ{FT, IT, VD}
+    # FT-->(F)loat (T)ype; IT-->(I)int (T)ype; VD-->(V)ertex (D)egree
+
+    xᵛ::FT 
+    yᵛ::FT 
     
     # intra vertex connecivity 
-    EoV::FV # (E)dges (o)n (V)ertex; set of edges that define the boundary $D_i$
-    CoV::FV # (C)ells (o)n (V)ertex 
+    EoV::NTuple{VD, IT} # (E)dges (o)n (V)ertex; set of edges that define the boundary $D_i$
+    CoV::NTuple{VD, IT} # (C)ells (o)n (V)ertex 
     
     # inter vertex connecivity
 
     # area of triangle 
-    AT::F
+    AT::FT
 end 
 
-stack(arr, N) = [arr[:,i] for i in 1:N]
+stack(arr, N) = [Tuple(arr[:,i]) for i in 1:N]
 
 function readPrimaryMesh(ds)
     
@@ -94,10 +102,11 @@ function readPrimaryMesh(ds)
     CoC = stack(ds["cellsOnCell"], ds.dim["nCells"])
 
     # Cell area
-    AC = ds["areaCell"]
+    AC = ds["areaCell"][:]
 
     StructArray{Pᵢ}((xᶜ = xᶜ, yᶜ = yᶜ, AC = AC,
-                     EoC = EoC, VoC = VoC, CoC = CoC, nEoC = nEoC))
+                     EoC = EoC, VoC = VoC, CoC = CoC,
+                     nEoC = nEoC))
 end
 
 function readDualMesh(ds)
@@ -111,7 +120,7 @@ function readDualMesh(ds)
     CoV = stack(ds["cellsOnVertex"], ds.dim["nVertices"])
 
     # Triangle area
-    AT = ds["areaTriangle"]
+    AT = ds["areaTriangle"][:]
 
     StructArray{Dᵢ}((xᵛ = xᵛ, yᵛ = yᵛ, EoV = EoV, CoV = CoV, AT=AT))
 end 
@@ -145,4 +154,7 @@ PrimaryMesh = readPrimaryMesh(ds)
 DualMesh    = readDualMesh(ds)
 edges       = readEdgeInfo(ds)
 
-mesh = Mesh(PrimaryMesh, DualMesh, edges)
+# adapting SoA to GPUs for mesh classes is as simple as: 
+PrimaryMesh = Adapt.adapt(CUDABackend(), PrimaryMesh)
+
+#mesh = Mesh(PrimaryMesh, DualMesh, edges)
