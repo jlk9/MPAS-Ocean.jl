@@ -1,4 +1,5 @@
 using CUDA
+using Accessors
 using NCDatasets
 using StructArrays
 
@@ -26,7 +27,10 @@ end
 
 # this is a line segment
 struct edge{FT, IT, TWO, ME2} 
-    # FT-->(F)loat (T)ype; IT-->(I)int (T)ype; TWO --> (2); ME2-->(M)ax (E)dges * (2) 
+    # FT  --> (F)loat (T)ype
+    # IT  --> (I)int (T)ype
+    # TWO --> (2)
+    # ME2 --> (M)ax (E)dges * (2) 
 
     xᵉ::FT   # X coordinate of edge midpoints in cartesian space
     yᵉ::FT   # Y coordinate of edge midpoints in cartesian space
@@ -49,7 +53,9 @@ end
 
 # (P)rimary mesh cell
 struct Pᵢ{FT, IT, ME} 
-    # FT-->(F)loat (T)ype; IT-->(I)int (T)ype; ME-->(M)ax (E)dges
+    # FT --> (F)loat (T)ype
+    # IT --> (I)int (T)ype
+    # ME --> (M)ax (E)dges
     
     xᶜ::FT   # X coordinate of cell centers in cartesian space
     yᶜ::FT   # Y coordinate of cell centers in cartesian space
@@ -62,15 +68,18 @@ struct Pᵢ{FT, IT, ME}
 
     # inter cell connectivity
     CoC::NTuple{ME, IT} # (C)ells    (o)n (C)ell
-    #ESoC::NTuple{ME, FT} # (E)dge (S)ign (o)n (C)ell; 
+    ESoC::NTuple{ME, IT} # (E)dge (S)ign (o)n (C)ell; 
 
     # area of cell 
     AC::FT
 end
 
 # (D)ual mesh cell
-struct Dᵢ{FT, IT, VD}
-    # FT-->(F)loat (T)ype; IT-->(I)int (T)ype; VD-->(V)ertex (D)egree
+struct Dᵢ{FT, IT, VD, ME}
+    # FT --> (F)loat (T)ype
+    # IT --> (I)int (T)ype
+    # VD --> (V)ertex (D)egree
+    # ME --> (M)ax (E)dges
 
     xᵛ::FT 
     yᵛ::FT 
@@ -80,6 +89,7 @@ struct Dᵢ{FT, IT, VD}
     CoV::NTuple{VD, IT} # (C)ells (o)n (V)ertex 
     
     # inter vertex connecivity
+    ESoV::NTuple{ME, IT} #(E)dge (S)ign (o)n Vertex
 
     # area of triangle 
     AT::FT
@@ -89,40 +99,56 @@ stack(arr, N) = [Tuple(arr[:,i]) for i in 1:N]
 
 function readPrimaryMesh(ds)
     
+    # get dimension info 
+    nCells  = ds.dim["nCells"] 
+    maxEdges = ds.dim["maxEdges"]
+
     # coordinate data 
     xᶜ = ds["xCell"][:]
     yᶜ = ds["yCell"][:]
     
-    nEoC = ds["nEdgesOnCell"]
-
+    nEoC = ds["nEdgesOnCell"][:]
+    
     # intra connectivity
-    EoC = stack(ds["edgesOnCell"], ds.dim["nCells"])
-    VoC = stack(ds["verticesOnCell"], ds.dim["nCells"])
+    EoC = stack(ds["edgesOnCell"], nCells)
+    VoC = stack(ds["verticesOnCell"], nCells)
     # inter connectivity
-    CoC = stack(ds["cellsOnCell"], ds.dim["nCells"])
+    CoC = stack(ds["cellsOnCell"], nCells)
+    # edge sign on cell, empty for now will be popupated later
+    ESoC = stack(zeros(eltype(nEoC), (maxEdges, nCells)), nCells)
 
     # Cell area
     AC = ds["areaCell"][:]
 
     StructArray{Pᵢ}((xᶜ = xᶜ, yᶜ = yᶜ, AC = AC,
                      EoC = EoC, VoC = VoC, CoC = CoC,
-                     nEoC = nEoC))
+                     nEoC = nEoC, ESoC = ESoC))
 end
 
 function readDualMesh(ds)
+
+    # get dimension info 
+    nVertices = ds.dim["nVertices"] 
+    maxEdges  = ds.dim["maxEdges"]
 
     # coordinate data 
     xᵛ = ds["xVertex"][:]
     yᵛ = ds["yVertex"][:]
     
     # intra connectivity
-    EoV = stack(ds["edgesOnVertex"], ds.dim["nVertices"])
-    CoV = stack(ds["cellsOnVertex"], ds.dim["nVertices"])
+    EoV = stack(ds["edgesOnVertex"], nVertices)
+    CoV = stack(ds["cellsOnVertex"], nVertices)
+    
+    # get the integer type from the NetCDF file
+    int_type = eltype(ds["edgesOnVertex"])
+    # edge sign on vertex, empty for now will be popupated later
+    ESoV = stack(zeros(int_type, (maxEdges, nVertices)), nVertices)
 
     # Triangle area
     AT = ds["areaTriangle"][:]
 
-    StructArray{Dᵢ}((xᵛ = xᵛ, yᵛ = yᵛ, EoV = EoV, CoV = CoV, AT=AT))
+    StructArray{Dᵢ}((xᵛ = xᵛ, yᵛ = yᵛ, AT = AT,
+                     EoV = EoV, CoV = CoV, ESoV = ESoV))
 end 
 
 function readEdgeInfo(ds)
@@ -148,13 +174,70 @@ function readEdgeInfo(ds)
                       lₑ = lₑ, dₑ = dₑ)
 end
 
+function signIndexField!(primaryMesh::StructArray{Pᵢ}, egdes::StructArray{edge})
+    
+    # create tmp array to store ESoC (b/c struct is immutable)
+    edgeSignOnCell = hcat(collect.(primaryMesh.ESoC)...)
+
+    @inbounds for (iCell, Cell) in enumerate(primaryMesh), i in 1:Cell.nEoC
+         
+        iEdge = Cell.EoC[i]
+        
+        # vector points from cell 1 to cell 2
+        if iCell == edges[iEdge].CoE[1]
+            edgeSignOnCell[i,iCell] = -1
+        else 
+            edgeSignOnCell[i,iCell] = 1
+        end 
+    
+        # PrimaryCell struct is immutable so need to use Accessor package,
+        # convert mutable array to the immutable NTuple type of a Primary Cell 
+        @reset Cell.ESoC = typeof(Cell.ESoC)(edgeSignOnCell[:,iCell]) 
+        # SoA package creates a view of the parent arrays
+        # https://juliaarrays.github.io/StructArrays.jl/stable/counterintuitive
+        primaryMesh[iCell] = Cell
+    end    
+end 
+
+function signIndexField!(dualMesh::StructArray{Dᵢ}, egdes::StructArray{edge})
+    
+    # vertex Degree (3); constant for all dual cells [this is hacky...]
+    vertexDegree = length(dualMesh[1].EoV)
+    # create tmp array to store ESoC (b/c struct is immutable)
+    edgeSignOnVertex = hcat(collect.(dualMesh.ESoV)...)
+
+    @inbounds for (iVertex, Vertex) in enumerate(dualMesh), i in 1:vertexDegree
+         
+        iEdge = Vertex.EoV[i]
+        
+        # vector points from cell 1 to cell 2
+        if iVertex == edges[iEdge].VoE[1]
+            edgeSignOnVertex[i,iVertex] = -1
+        else 
+            edgeSignOnVertex[i,iVertex] = 1
+        end 
+    
+        # DualCell struct is immutable so need to use Accessor package,
+        # convert mutable array to the immutable NTuple type of a Dual Cell 
+        @reset Vertex.ESoV = typeof(Vertex.ESoV)(edgeSignOnVertex[:,iVertex]) 
+        # SoA package creates a view of the parent arrays
+        # https://juliaarrays.github.io/StructArrays.jl/stable/counterintuitive
+        dualMesh[iVertex] = Vertex
+    end    
+end 
+
 ds = NCDataset("../../test/MokaMesh.nc")
 
 PrimaryMesh = readPrimaryMesh(ds)
 DualMesh    = readDualMesh(ds)
 edges       = readEdgeInfo(ds)
 
+# set the edge sign on cells (primary mesh)
+signIndexField!(PrimaryMesh, edges)
+# set the edge sign on vertices (dual mesh)
+signIndexField!(DualMesh, edges)
+
 # adapting SoA to GPUs for mesh classes is as simple as: 
-PrimaryMesh = Adapt.adapt(CUDABackend(), PrimaryMesh)
+#PrimaryMesh = Adapt.adapt(CUDABackend(), PrimaryMesh)
 
 #mesh = Mesh(PrimaryMesh, DualMesh, edges)
