@@ -1,23 +1,20 @@
 using UnPack
-using MPAS_O: GlobalConfig, Mesh, ConfigGet, NCDataset
-#Base.@kwdef
-mutable struct PrognosticVars{F<:AbstractFloat}
+#using MPAS_O: GlobalConfig, Mesh, ConfigGet, NCDataset
+
+
+mutable struct PrognosticVars{F<:AbstractFloat, FV2 <: AbstractArray{F,2}, FV3 <: AbstractArray{F, 3}}
 
     # var: sea surface height [m] 
     # dim: (nCells, Time)
-    ssh::Array{F, 2} 
+    ssh::FV2
 
     # var: horizonal velocity, normal component to an edge [m s^{-1}]
     # dim: (nVertLevels, nEdges, Time)
-    normalVelocity::Array{F, 3}
+    normalVelocity::FV3
 
     # var: layer thickness [m]
     # dim: (nVertLevels, nCells, Time)
-    layerThickness::Array{F,3}
-
-    ####################
-    # UNUSED FOR NOW: 
-    ####################
+    layerThickness::FV3
 
     ## var: potential temperature [deg C]
     ## dim: (nVertLevels, nCells, Time)
@@ -26,6 +23,24 @@ mutable struct PrognosticVars{F<:AbstractFloat}
     ## var: salinity [g salt per kg seawater]
     ## dim: (nVertLevels, nCells, Time)
     #salinity::Array{F,3} = zeros(F, nVertLevels, nCells, nTimeLevels)
+    
+    function PrognosticVars(ssh::AT2D,
+                            normalVelocity::AT3D,
+                            layerThickness::AT3D) where {AT2D, AT3D}
+
+        # pack all the arguments into a tuple for type and backend checking
+        args = (ssh, normalVelocity, layerThickness)
+        
+        # check the type names; irrespective of type parameters
+        # (e.g. `Array` instead of `Array{Float64, 1}`)
+        check_typeof_args(args)
+        # check that all args are on the same backend
+        check_args_backend(args)
+        # check that all args have the same `eltype` and get that type
+        type = check_eltype_args(args)
+
+        new{type, AT2D, AT3D}(ssh, normalVelocity, layerThickness)
+    end        
 end 
 
 function PrognosticVars_init(config::GlobalConfig, mesh::Mesh)
@@ -64,7 +79,7 @@ function PrognosticVars_init(config::GlobalConfig, mesh::Mesh)
     layerThickness[:,:,:] .= input["layerThickness"][:,:,1]
     
     # return instance of Prognostic struct 
-    PrognosticVars{Float64}(ssh, normalVelocity, layerThickness)
+    PrognosticVars(ssh, normalVelocity, layerThickness)
 end 
 
 

@@ -27,5 +27,6 @@ module MPAS_O
 
     include("forward/init.jl")
     include("forward/time_integration.jl")
-
-end 
+    
+    include("Architectures.jl")
+end
