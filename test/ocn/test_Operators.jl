@@ -1,34 +1,39 @@
 using Test
+using CUDA
 using UnPack
 using LinearAlgebra
 using MPAS_O: Mesh, ReadMesh, GradientOnEdge,  DivergenceOnCell
 
+import Adapt
 import Downloads
 import KernelAbstractions as KA
 
 abstract type TestCase end 
 abstract type PlanarTest <: TestCase end 
 
+on_architecture(backend::KA.Backend, array::AbstractArray) = Adapt.adapt_storage(backend, array)
 
-struct TestSetup{FT}
+struct TestSetup{FT, AT}
+    
+    backend::KA.Backend
 
-    xᶜ::Array{FT,1} 
-    yᶜ::Array{FT,1} 
+    xᶜ::AT 
+    yᶜ::AT 
 
-    xᵉ::Array{FT,1}
-    yᵉ::Array{FT,1}
+    xᵉ::AT
+    yᵉ::AT
 
     Lx::FT 
     Ly::FT
 
-    EdgeNormalX::Array{FT,1}
-    EdgeNormalY::Array{FT,1}
+    EdgeNormalX::AT
+    EdgeNormalY::AT
     
-    TestSetup{FT}(xᶜ, yᶜ, xᵉ, yᵉ, Lx, Ly, EdgeNormalX, EdgeNormalY) where {FT} = 
-        new{FT}(xᶜ, yᶜ, xᵉ, yᵉ, Lx, Ly, EdgeNormalX, EdgeNormalY)
+    #TestSetup{FT,AT}(xᶜ, yᶜ, xᵉ, yᵉ, Lx, Ly, EdgeNormalX, EdgeNormalY) where {FT} = 
+    #    new{FT}(xᶜ, yᶜ, xᵉ, yᵉ, Lx, Ly, EdgeNormalX, EdgeNormalY)
 end 
 
-function TestSetup(mesh::Mesh, ::Type{PlanarTest})
+function TestSetup(mesh::Mesh, ::Type{PlanarTest}; backend=KA.CPU())
 
     @unpack xEdge, xCell, yEdge, yCell, angleEdge = mesh
     
@@ -42,14 +47,14 @@ function TestSetup(mesh::Mesh, ::Type{PlanarTest})
     EdgeNormalX = cos.(angleEdge)
     EdgeNormalY = sin.(angleEdge)
 
-    return TestSetup{FT}(xCell,
-                         yCell,
-                         xEdge,
-                         yEdge, 
-                         Lx,
-                         Ly,
-                         EdgeNormalX,
-                         EdgeNormalY)
+    return TestSetup(backend, 
+                     on_architecture(backend, xCell),
+                     on_architecture(backend, yCell),
+                     on_architecture(backend, xEdge),
+                     on_architecture(backend, yEdge), 
+                     Lx, Ly,
+                     on_architecture(backend, EdgeNormalX),
+                     on_architecture(backend, EdgeNormalY))
 end 
 
 """
@@ -127,22 +132,37 @@ function ∇hₑ(test::TestSetup, ::Type{TC}) where {TC <: TestCase}
     return @. EdgeNormalX * ∂hᵢ∂x + EdgeNormalY * ∂hᵢ∂y
 end
 
-function gradient!(grad, hᵢ, mesh::Mesh)
+function gradient!(grad, hᵢ, mesh::Mesh; backend=KA.CPU())
     
-    @unpack cellsOnEdge, dcEdge, nEdges = mesh 
+    #@unpack cellsOnEdge, dcEdge, nEdges = mesh 
     
-    backend = KA.get_backend(grad)
+    # get scalar info out of mesh struct
+    nEdges = mesh.nEdges
+    # move mesh arrays to backend 
+    dcEdge = Adapt.adapt(backend, mesh.dcEdge)
+    cellsOnEdge = Adapt.adapt(backend, mesh.cellsOnEdge)
+    
+    #backend = KA.get_backend(grad)
     kernel! = GradientOnEdge(backend)
     kernel!(cellsOnEdge, dcEdge, hᵢ, grad, ndrange=nEdges)
 
     KA.synchronize(backend)
 end
 
-function divergence!(div, 𝐅ₑ, mesh::Mesh)
+function divergence!(div, 𝐅ₑ, mesh::Mesh; backend=KA.CPU())
 
-    @unpack nEdgesOnCell, edgesOnCell, edgeSignOnCell, dvEdge, areaCell, nCells = mesh
+    #@unpack nEdgesOnCell, edgesOnCell, edgeSignOnCell, dvEdge, areaCell, nCells = mesh
+    
+    # get scalar info out of mesh struct
+    nCells = mesh.nCells
+    # move mesh arrays to backend 
+    dvEdge = Adapt.adapt(backend, mesh.dvEdge)
+    areaCell = Adapt.adapt(backend, mesh.areaCell)
+    edgesOnCell = Adapt.adapt(backend, mesh.edgesOnCell)
+    nEdgesOnCell = Adapt.adapt(backend, mesh.nEdgesOnCell) 
+    edgeSignOnCell = Adapt.adapt(backend, mesh.edgeSignOnCell)
 
-    backend = KA.get_backend(div) 
+    #backend = KA.get_backend(div) 
     kernel! = DivergenceOnCell(backend)
     
     kernel!(nEdgesOnCell, edgesOnCell, edgeSignOnCell, dvEdge, areaCell, 𝐅ₑ, div, ndrange=nCells)
@@ -160,7 +180,10 @@ mesh_fn  = "MokaMesh.nc"
 
 mesh = ReadMesh(mesh_fn)
 
-setup = TestSetup(mesh, PlanarTest)
+#backend = KA.CPU()
+backend = CUDABackend();
+CUDA.allowscalar()
+setup = TestSetup(mesh, PlanarTest; backend=backend)
 
 ###
 ### Gradient Test
@@ -169,9 +192,9 @@ setup = TestSetup(mesh, PlanarTest)
 # Scalar field define at cell centers
 Scalar  = h(setup, PlanarTest)
 
-gradNum = zeros(mesh.nEdges)
+gradNum = KA.zeros(backend, Float64, mesh.nEdges)
 gradAnn = ∇hₑ(setup, PlanarTest)
-gradient!(gradNum, Scalar, mesh)
+gradient!(gradNum, Scalar, mesh; backend=backend)
 gradNorm = norm(gradAnn .- gradNum, Inf) / norm(gradNum, Inf)
 
 ###
@@ -181,22 +204,22 @@ gradNorm = norm(gradAnn .- gradNum, Inf) / norm(gradNum, Inf)
 # Edge normal component of vector value field defined at cell edges
 VecEdge = 𝐅ₑ(setup, PlanarTest)
 
-divNum = zeros(mesh.nCells)
+divNum = KA.zeros(backend, Float64, mesh.nCells)
 divAnn = div𝐅(setup, PlanarTest)
-divergence!(divNum, VecEdge, mesh)
+divergence!(divNum, VecEdge, mesh; backend=backend)
 divNorm = norm(divAnn .- divNum, Inf) / norm(divNum, Inf) 
 
 ###
 ### Results Display
 ###
 
-println("\n" * "="^40)
-println("Kernel Abstraction Operator Tests")
-println("="^40 * "\n")
+arch = typeof(backend) <: KA.GPU ? "GPU" : "CPU" 
+
+println("\n" * "="^45)
+println("Kernel Abstraction Operator Tests on $arch")
+println("="^45 * "\n")
 println("L∞ norm of Graident  : $gradNorm")
 println("L∞ norm of Divergence: $divNorm")
-print("\n" * "="^40 * "\n")
-
-
+print("\n" * "="^45 * "\n")
 
 

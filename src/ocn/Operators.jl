@@ -16,7 +16,7 @@ using KernelAbstractions
                                   @Const(areaCell),
                                   @Const(VecEdge),
                                   DivCell)
-    iCell = @index(Global)
+    iCell = @index(Global, Linear)
     
     # get inverse cell area
     invArea = 1. / areaCell[iCell]
@@ -47,7 +47,7 @@ end
                                 @Const(ScalarCell), 
                                 GradEdge)
     # global indices over nEdges
-    iEdge = @index(Global)
+    iEdge = @index(Global, Linear)
 
     # cell connectivity information for iEdge
     @inbounds jCell1 = cellsOnEdge[1,iEdge]      
