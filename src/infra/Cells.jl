@@ -4,13 +4,19 @@ using NCDatasets
 using StructArrays
 
 import Adapt
-
+import KernelAbstractions as KA
 
 # Mesh strucutre comprised of the 
 struct Mesh{PCT, DCT, EST}
-    PC::StructArray{PCT}
-    DC::StructArray{DCT}
-    E::StructArray{EST}
+    PrimaryCells::StructArray{PCT}
+    DualCells::StructArray{DCT}
+    Edges::StructArray{EST}
+end
+
+function Adapt.adapt_structure(backend, x::Mesh)
+    return Mesh(Adapt.adapt(backend, x.PrimaryCells), 
+                Adapt.adapt(backend, x.DualCells),
+                Adapt.adapt(backend, x.Edges))
 end
 
 # dimensions of the mesh 
@@ -174,11 +180,12 @@ function readEdgeInfo(ds)
                       lₑ = lₑ, dₑ = dₑ)
 end
 
-function signIndexField!(primaryMesh::StructArray{Pᵢ}, egdes::StructArray{edge})
+function signIndexField!(primaryMesh::StructArray{Pᵢ}, edges::StructArray{edge})
     
     # create tmp array to store ESoC (b/c struct is immutable)
     edgeSignOnCell = hcat(collect.(primaryMesh.ESoC)...)
-
+    
+    # `eachindex`, instead of `enumerate`?
     @inbounds for (iCell, Cell) in enumerate(primaryMesh), i in 1:Cell.nEoC
          
         iEdge = Cell.EoC[i]
@@ -199,7 +206,7 @@ function signIndexField!(primaryMesh::StructArray{Pᵢ}, egdes::StructArray{edge
     end    
 end 
 
-function signIndexField!(dualMesh::StructArray{Dᵢ}, egdes::StructArray{edge})
+function signIndexField!(dualMesh::StructArray{Dᵢ}, edges::StructArray{edge})
     
     # vertex Degree (3); constant for all dual cells [this is hacky...]
     vertexDegree = length(dualMesh[1].EoV)
@@ -226,18 +233,24 @@ function signIndexField!(dualMesh::StructArray{Dᵢ}, egdes::StructArray{edge})
     end    
 end 
 
-ds = NCDataset("../../test/MokaMesh.nc")
+function ReadMesh(meshPath::String; backend=KA.CPU())
+    
+    ds = NCDataset(meshPath, "r", format=:netcdf4)
 
-PrimaryMesh = readPrimaryMesh(ds)
-DualMesh    = readDualMesh(ds)
-edges       = readEdgeInfo(ds)
+    PrimaryMesh = readPrimaryMesh(ds)
+    DualMesh    = readDualMesh(ds)
+    edges       = readEdgeInfo(ds)
+    
+    # set the edge sign on cells (primary mesh)
+    signIndexField!(PrimaryMesh, edges)
+    # set the edge sign on vertices (dual mesh)
+    signIndexField!(DualMesh, edges)
+    
+    # adapting SoA to GPUs for mesh classes is as simple as: 
+    #PrimaryMesh = Adapt.adapt(CUDABackend(), PrimaryMesh)
+    
+    mesh = Mesh(PrimaryMesh, DualMesh, edges)
 
-# set the edge sign on cells (primary mesh)
-signIndexField!(PrimaryMesh, edges)
-# set the edge sign on vertices (dual mesh)
-signIndexField!(DualMesh, edges)
+    Adapt.adapt_structure(backend, mesh)
+end
 
-# adapting SoA to GPUs for mesh classes is as simple as: 
-#PrimaryMesh = Adapt.adapt(CUDABackend(), PrimaryMesh)
-
-#mesh = Mesh(PrimaryMesh, DualMesh, edges)
