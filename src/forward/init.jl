@@ -1,4 +1,4 @@
-function ocn_init(Config_filepath)
+function ocn_init(Config_filepath, backend=KA.CPU())
     
     # read the configuration file 
     Config = ConfigRead(Config_filepath)
@@ -6,7 +6,7 @@ function ocn_init(Config_filepath)
     #TO DO: Read constants ?? 
 
     # setup the mesh 
-    Mesh = ocn_setup_mesh(Config)
+    Mesh = ocn_setup_mesh(Config; backend=backend)
 
     # setup clock 
     Clock = ocn_setup_clock(Config)
