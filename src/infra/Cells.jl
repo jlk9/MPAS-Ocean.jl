@@ -6,6 +6,30 @@ using StructArrays
 import Adapt
 import KernelAbstractions as KA
 
+###
+### Types 
+
+"""
+    Cell
+
+A type describing the location at the center of Primary Cell
+"""
+struct Cell end
+
+"""
+    Vertex
+
+A type describing the location at the center of Dual Cells
+"""
+struct Vertex end
+
+"""
+    Edge
+
+A type describing the location edge points where velocity is defined
+"""
+struct Edge end
+
 # Mesh strucutre comprised of the 
 struct Mesh{PCT, DCT, EST}
     PrimaryCells::StructArray{PCT}
