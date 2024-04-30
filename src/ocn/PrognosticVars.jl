@@ -1,7 +1,6 @@
 using UnPack
 #using MPAS_O: GlobalConfig, Mesh, ConfigGet, NCDataset
 
-
 mutable struct PrognosticVars{F<:AbstractFloat, FV2 <: AbstractArray{F,2}, FV3 <: AbstractArray{F, 3}}
 
     # var: sea surface height [m] 
@@ -43,7 +42,9 @@ mutable struct PrognosticVars{F<:AbstractFloat, FV2 <: AbstractArray{F,2}, FV3 <
     end        
 end 
 
-function PrognosticVars_init(config::GlobalConfig, mesh::Mesh)
+function PrognosticVars_init(config::GlobalConfig,
+                             mesh::Mesh,
+                             backend=KA.CPU())
     
     timeManagementConfig = ConfigGet(config.namelist, "time_management")
     do_restart = ConfigGet(timeManagementConfig, "config_do_restart")
@@ -67,20 +68,18 @@ function PrognosticVars_init(config::GlobalConfig, mesh::Mesh)
     input = NCDataset(input_filename)
 
     ssh = zeros(Float64, nCells, nTimeLevels)
-    # TO DO: check that the input file only has one time level 
-    ssh[:,:] .= input["ssh"][:,1]
-    
     normalVelocity = zeros(Float64, nVertLevels, nEdges, nTimeLevels)
-    # TO DO: check that the input file only has one time level
-    normalVelocity[:,:,:] .= input["normalVelocity"][:,:,1]
-    
     layerThickness = zeros(Float64, nVertLevels, nCells, nTimeLevels)
+
     # TO DO: check that the input file only has one time level 
+    # broadcast the input value across all the time levels in the Prog struct
+    ssh[:,:] .= input["ssh"][:,1]
+    normalVelocity[:,:,:] .= input["normalVelocity"][:,:,1]
     layerThickness[:,:,:] .= input["layerThickness"][:,:,1]
     
     # return instance of Prognostic struct 
-    PrognosticVars(ssh, normalVelocity, layerThickness)
+    PrognosticVars(Adapt.adapt(backend, ssh),
+                   Adapt.adapt(normalVelocity), 
+                   Adapt.adapt(layerThickness))
 end 
-
-
 

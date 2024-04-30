@@ -4,7 +4,7 @@ mutable struct DiagnosticVars{F}
     # dim: (nVertLevels, nEdges) Time?)
     layerThicknessEdge::Array{F,2}
     
-    # NOTE: layerThickness is not a diagnostic variable, but it placed 
+    # NOTE: restingThickness is not a diagnostic variable, but it placed 
     #       here since we need to read it from a file and that's convinent 
     # var: Layer thickness when the ocean is at rest [m]
     # dim: (nVertLevels, nCells)
@@ -42,7 +42,9 @@ mutable struct DiagnosticVars{F}
     =# 
 end 
  
-function DiagnosticVars_init(config::GlobalConfig, Mesh::Mesh) 
+function DiagnosticVars_init(config::GlobalConfig,
+                             Mesh::Mesh,
+                             backend=KA.CPU())
     
     @unpack nVertLevels, nCells, nEdges= Mesh
 
@@ -56,16 +58,14 @@ function DiagnosticVars_init(config::GlobalConfig, Mesh::Mesh)
     # need to be done, such that only diagnostic variables required by 
     # the `Config` or requested by the `streams` will be activated. 
     
-    #div_hu = zeros(Float64, nVertLevels, nCells)
-    #gradSSH = zeros(Float64, nEdges)
     layerThicknessEdge = zeros(Float64, nVertLevels, nEdges) 
-    
     restingThickness = zeros(Float64, nVertLevels, nCells)
+
     # TO DO: Put into the diagnsotic and/or vertical grid struct 
     restingThickness[:,:] = input["restingThickness"][:,:,1]
 
-    DiagnosticVars{Float64}(layerThicknessEdge, 
-                            restingThickness)
+    DiagnosticVars{Float64}(Adapt.adapt(backend, layerThicknessEdge), 
+                            Adapt.adapt(backend, restingThickness))
 end 
 
 function diagnostic_compute!(Mesh::Mesh, Diag::DiagnosticVars, Prog::PrognosticVars)
