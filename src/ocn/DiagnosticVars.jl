@@ -4,12 +4,6 @@ mutable struct DiagnosticVars{F}
     # dim: (nVertLevels, nEdges) Time?)
     layerThicknessEdge::Array{F,2}
     
-    # NOTE: restingThickness is not a diagnostic variable, but it placed 
-    #       here since we need to read it from a file and that's convinent 
-    # var: Layer thickness when the ocean is at rest [m]
-    # dim: (nVertLevels, nCells)
-    restingThickness::Array{F,2}
-
     #= Performance Note: 
     # ###########################################################
     #  While these can be stored as diagnostic variales I don't 
@@ -61,8 +55,6 @@ function DiagnosticVars_init(config::GlobalConfig,
     layerThicknessEdge = zeros(Float64, nVertLevels, nEdges) 
     restingThickness = zeros(Float64, nVertLevels, nCells)
 
-    # TO DO: Put into the diagnsotic and/or vertical grid struct 
-    restingThickness[:,:] = input["restingThickness"][:,:,1]
 
     DiagnosticVars{Float64}(Adapt.adapt(backend, layerThicknessEdge), 
                             Adapt.adapt(backend, restingThickness))
