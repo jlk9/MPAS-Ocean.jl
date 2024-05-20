@@ -1,10 +1,3 @@
-using KernelAbstractions 
-import Adapt
-
-const KA = KernelAbstractions
-
-include("Cells.jl")
-
 mutable struct VerticalCoordinate{CC2DA, VA}
     restingThickness::CC2DA
     movementWeights::VA
@@ -15,6 +8,7 @@ mutable struct VerticalMesh{IV, FV, AL}
     maxLevelCell::IV
     maxLevelEdge::AL
     maxLevelVertex::AL
+
     # var: Layer thickness when the ocean is at rest [m]
     # dim: (nVertLevels, nCells)
     restingThickness::FV
@@ -57,6 +51,3 @@ function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
                  ActiveLevelsVertex, 
                  Adapt.adapt(backend, restingThickness))
 end
-
-mesh = ReadMesh("test/MokaMesh.nc")
-test = VerticalMesh("test/MokaMesh.nc", mesh; backend=ROCBackend())

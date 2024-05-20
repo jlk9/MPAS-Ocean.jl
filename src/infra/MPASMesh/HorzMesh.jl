@@ -8,6 +8,7 @@ import KernelAbstractions as KA
 
 ###
 ### Types 
+###
 
 """
     Cell
@@ -30,17 +31,28 @@ A type describing the location edge points where velocity is defined
 """
 struct Edge end
 
-# Mesh strucutre comprised of the 
-struct Mesh{PCT, DCT, EST}
+
+### 
+### Horizontal mesh struct
+###
+
+"""
+    HorzMesh
+
+A struct, comprised of SoA, describing a 2-D TRiSK mesh
+"""
+struct HorzMesh{PCT, DCT, EST}
     PrimaryCells::StructArray{PCT}
     DualCells::StructArray{DCT}
     Edges::StructArray{EST}
 end
 
-function Adapt.adapt_structure(backend, x::Mesh)
-    return Mesh(Adapt.adapt(backend, x.PrimaryCells), 
-                Adapt.adapt(backend, x.DualCells),
-                Adapt.adapt(backend, x.Edges))
+"""
+"""
+function Adapt.adapt_structure(backend, x::HorzMesh)
+    return HorzMesh(Adapt.adapt(backend, x.PrimaryCells), 
+                    Adapt.adapt(backend, x.DualCells),
+                    Adapt.adapt(backend, x.Edges))
 end
 
 # dimensions of the mesh 
@@ -56,7 +68,7 @@ end
 ###
 
 # this is a line segment
-struct edge{FT, IT, TWO, ME2} 
+struct eᵢ{FT, IT, TWO, ME2} 
     # FT  --> (F)loat (T)ype
     # IT  --> (I)int (T)ype
     # TWO --> (2)
@@ -199,12 +211,12 @@ function readEdgeInfo(ds)
     dₑ = ds["dcEdge"][:]
 
         
-    StructArray{edge}(xᵉ = xᵉ, yᵉ = yᵉ,
-                      CoE = CoE, VoE = VoE, EoE = EoE, WoE = WoE,
-                      lₑ = lₑ, dₑ = dₑ)
+    StructArray{eᵢ}(xᵉ = xᵉ, yᵉ = yᵉ,
+                    CoE = CoE, VoE = VoE, EoE = EoE, WoE = WoE,
+                    lₑ = lₑ, dₑ = dₑ)
 end
 
-function signIndexField!(primaryMesh::StructArray{Pᵢ}, edges::StructArray{edge})
+function signIndexField!(primaryMesh::StructArray{Pᵢ}, edges::StructArray{eᵢ})
     
     # create tmp array to store ESoC (b/c struct is immutable)
     edgeSignOnCell = hcat(collect.(primaryMesh.ESoC)...)
@@ -230,7 +242,7 @@ function signIndexField!(primaryMesh::StructArray{Pᵢ}, edges::StructArray{edge
     end    
 end 
 
-function signIndexField!(dualMesh::StructArray{Dᵢ}, edges::StructArray{edge})
+function signIndexField!(dualMesh::StructArray{Dᵢ}, edges::StructArray{eᵢ})
     
     # vertex Degree (3); constant for all dual cells [this is hacky...]
     vertexDegree = length(dualMesh[1].EoV)
@@ -257,7 +269,7 @@ function signIndexField!(dualMesh::StructArray{Dᵢ}, edges::StructArray{edge})
     end    
 end 
 
-function ReadMesh(meshPath::String; backend=KA.CPU())
+function ReadHorzMesh(meshPath::String; backend=KA.CPU())
     
     ds = NCDataset(meshPath, "r", format=:netcdf4)
 
@@ -270,11 +282,9 @@ function ReadMesh(meshPath::String; backend=KA.CPU())
     # set the edge sign on vertices (dual mesh)
     signIndexField!(DualMesh, edges)
     
-    # adapting SoA to GPUs for mesh classes is as simple as: 
-    #PrimaryMesh = Adapt.adapt(CUDABackend(), PrimaryMesh)
+    mesh = HorzMesh(PrimaryMesh, DualMesh, edges)
     
-    mesh = Mesh(PrimaryMesh, DualMesh, edges)
-
+    # move the horizontal mesh struct to requested backend
     Adapt.adapt_structure(backend, mesh)
 end
 
