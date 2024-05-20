@@ -55,14 +55,6 @@ function Adapt.adapt_structure(backend, x::HorzMesh)
                     Adapt.adapt(backend, x.Edges))
 end
 
-# dimensions of the mesh 
-struct dims
-    # Number of unique nodes (i.e. cells, edges, vertices)
-    Nᶜ::Int 
-    Nᵉ::Int
-    Nᵛ::Int 
-end
-
 ###
 ### Nodes of elements
 ###

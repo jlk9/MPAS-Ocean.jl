@@ -1,5 +1,6 @@
-# structure for storing Model/Simulation structures 
+using MOKA.MPASMesh
 
+# structure for storing Model/Simulation structures 
 struct ModelSetup    
     config::GlobalConfig
     mesh::Mesh

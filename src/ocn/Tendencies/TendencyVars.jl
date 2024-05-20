@@ -50,7 +50,11 @@ end
 
 function TendencyVars(Config::GlobalConfig, Mesh::Mesh, backend=KA.CPU())
         
-    @unpack nVertLevels, nCells, nEdges= Mesh
+    nCells, = size(Mesh.HorzMesh.PrimaryCells)
+    nEdges, = size(Mesh.HorzMesh.Edges)
+    nVertLevels = Mesh.VertMesh.nVertLevels
+
+    #@unpack nVertLevels, nCells, nEdges= Mesh
     
     # create zero vectors to store tendecy vars on the desired backend
     tendNormalVelocity = KA.zeros(backend, Float64, nVertLevels, nEdges) 

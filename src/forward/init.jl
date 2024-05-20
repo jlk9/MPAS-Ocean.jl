@@ -1,4 +1,6 @@
-function ocn_init(Config_filepath, backend=KA.CPU())
+using MOKA.MPASMesh
+
+function ocn_init(Config_filepath; backend=KA.CPU())
     
     # read the configuration file 
     Config = ConfigRead(Config_filepath)
@@ -29,14 +31,18 @@ function ocn_init(Config_filepath, backend=KA.CPU())
 end 
 
 
-function ocn_setup_mesh(Config::GlobalConfig)
+function ocn_setup_mesh(Config::GlobalConfig; backend=KA.CPU())
     # get mesh section of the streams file
     meshConfig = ConfigGet(Config.streams, "mesh")
     # get mesh filepath from streams section
     mesh_fp = ConfigGet(meshConfig, "filename_template")
     # read the inut mesh from the configuartion file 
     # NOTE: This might be a restart file based on config options 
-    ReadMesh(mesh_fp)
+
+    h_mesh = ReadHorzMesh(mesh_fp)
+    v_mesh = VerticalMesh(mesh_fp, h_mesh)
+
+    Mesh(h_mesh, v_mesh)
 end 
 
 function ocn_setup_clock(Config::GlobalConfig)

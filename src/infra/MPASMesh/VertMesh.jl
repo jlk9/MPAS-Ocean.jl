@@ -3,7 +3,8 @@ mutable struct VerticalCoordinate{CC2DA, VA}
     movementWeights::VA
 end
 
-mutable struct VerticalMesh{IV, FV, AL}
+mutable struct VerticalMesh{I, IV, FV, AL}
+    nVertLevels::I
     minLevelCell::IV
     maxLevelCell::IV
     maxLevelEdge::AL
@@ -38,6 +39,7 @@ function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
     
     ds = NCDataset(mesh_fp, "r")
 
+    nVertLevels = ds.dim["nVertLevels"]
     minLevelCell = ds["minLevelCell"][:]
     maxLevelCell = ds["maxLevelCell"][:]
     restingThickness = ds["restingThickness"][:,:,1]
@@ -45,7 +47,8 @@ function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
     ActiveLevelsEdge = ActiveLevels{Edge}(mesh; backend=backend)
     ActiveLevelsVertex = ActiveLevels{Vertex}(mesh; backend=backend)
 
-    VerticalMesh(Adapt.adapt(backend, minLevelCell),
+    VerticalMesh(nVertLevels,
+                 Adapt.adapt(backend, minLevelCell),
                  Adapt.adapt(backend, maxLevelCell),
                  ActiveLevelsEdge,
                  ActiveLevelsVertex, 

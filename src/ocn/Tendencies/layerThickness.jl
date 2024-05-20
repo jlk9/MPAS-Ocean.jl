@@ -32,23 +32,39 @@ function horizontal_advection_tendency!(Mesh::Mesh,
                                         normalVelocity,
                                         layerThicknessEdge,
                                         tendLayerThickness)
+
+    @unpack HorzMesh, VertMesh = Mesh
     
-    @unpack nCells, nEdgesOnCell = Mesh
-    @unpack edgesOnCell, edgeSignOnCell = Mesh  
-    @unpack dvEdge, areaCell, maxLevelEdgeTop = Mesh 
+    # Global index
+    nCells, = size(HorzMesh.PrimaryCells)
+    # edge connectivity information
+    dvEdge = HorzMesh.Edges.lₑ
+    nEdgesOnCell = HorzMesh.PrimaryCells.nEoC
+    edgesOnCell = HorzMesh.PrimaryCells.EoC
+    edgeSignOnCell = HorzMesh.PrimaryCells.ESoC
+    # Primary mesh metrics
+    areaCell = HorzMesh.PrimaryCells.AC 
+    # Active ocean layers
+    maxLevelEdge = VertMesh.maxLevelEdge
+    
+    #@unpack nCells, nEdgesOnCell = Mesh
+    #@unpack edgesOnCell, edgeSignOnCell = Mesh  
+    #@unpack dvEdge, areaCell, maxLevelEdgeTop = Mesh 
     
     @fastmath for iCell in 1:nCells, i in 1:nEdgesOnCell[iCell]
-        iEdge = edgesOnCell[i,iCell]
+        # different indexing b/c SoA requires array of tuples
+        iEdge = edgesOnCell[iCell][i]
+
         invAreaCell = 1.0 / areaCell[iCell] # type stable? 
 
-        @fastmath for k in 1:maxLevelEdgeTop[iEdge]
+        @fastmath for k in 1:maxLevelEdge.Top[iEdge]
             
             # TODO: flux calculation should use `layerThicknessEdgeFlux`
             #       to allow for upwinding and linearization 
             flux = normalVelocity[k,iEdge] * dvEdge[iEdge] * 
                    layerThicknessEdge[k,iEdge]  
 
-            tendLayerThickness[k,iCell] += edgeSignOnCell[i,iCell] *
+                   tendLayerThickness[k,iCell] += edgeSignOnCell[iCell][i] *
                                            flux * invAreaCell
          
         end 

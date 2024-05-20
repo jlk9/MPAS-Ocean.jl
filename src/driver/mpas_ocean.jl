@@ -1,6 +1,9 @@
 using Dates
-using MPAS_O
+using MOKA
 using Statistics
+using KernelAbstractions 
+
+const KA=KernelAbstractions
 
 # file path to the config file. Should be parsed from the command line 
 #config_fp = "../../TestData/inertial_gravity_wave_100km.yml"
@@ -8,7 +11,7 @@ config_fp = "/global/homes/a/anolan/MPAS-Ocean.jl/bare_minimum.yml"
 
 function ocn_run(config_fp)
     # Initialize the Model  
-    Setup, Diag, Tend, Prog = ocn_init(config_fp)
+    Setup, Diag, Tend, Prog = ocn_init(config_fp, backend=KA.CPU())
     
     mesh = Setup.mesh 
     config = Setup.config
@@ -16,13 +19,14 @@ function ocn_run(config_fp)
     # this is hardcoded for now, but should really be set accordingly in the 
     # yaml file
     #dt = floor(3.0 * mean(mesh.dcEdge) / 1e3)
-    dt = floor(2 * (mean(mesh.dcEdge) / 1e3) * mean(mesh.dcEdge) / 200e3) 
+    dcEdge = mesh.HorzMesh.Edges.dₑ
+    dt = floor(2 * (mean(dcEdge) / 1e3) * mean(dcEdge) / 200e3) 
     changeTimeStep!(Setup.timeManager, Second(dt))
     
     clock = Setup.timeManager
     
-    simulationAlarm = clock.alarms[1]
-    outputAlarm = clock.alarms[2]
+    simulationAlarm = clock.alarms["simulation_end"]
+    outputAlarm = clock.alarms["outputAlarm"]
     
     global i = 0
     # Run the model 

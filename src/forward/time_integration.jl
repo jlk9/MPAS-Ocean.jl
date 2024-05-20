@@ -93,7 +93,7 @@ function ocn_timestep(Prog::PrognosticVars,
             normalVelocityProvis .= normalVelocityCurr .+ a[RK_step] .* tendNormalVelocity
             layerThicknessProvis .= layerThicknessCurr .+ a[RK_step] .* tendLayerThickness
             # compute ssh from layerThickness
-            sshProvis = layerThicknessProvis .- sum(Diag.restingThickness; dims=1)
+            sshProvis = layerThicknessProvis .- sum(Mesh.VertMesh.restingThickness; dims=1)
             # compute the diagnostics using the Provis State, 
             # i.e. the substage solution
             diagnostic_compute!(Mesh, Diag, Prog)
@@ -156,7 +156,7 @@ function ocn_timestep(Prog::PrognosticVars,
     #layerThickness[:,:,end] .= Diag.restingThickness[:,:] .+ reshape(Prog.ssh[:,end], 1, :) 
 
     layerThickness[:,:,end] .+= dt .* tendLayerThickness 
-    ssh[:,end] = layerThickness[:,:,end] .- sum(Diag.restingThickness; dims=1)
+    ssh[:,end] = layerThickness[:,:,end] .- sum(Mesh.VertMesh.restingThickness; dims=1)
 
     
     # pack the updated state varibales in the Prognostic structure

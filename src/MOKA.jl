@@ -4,31 +4,38 @@ module MOKA
     export RungeKutta4, ForwardEuler 
     export write_netcdf
     
+    # MPASMesh 
     export VerticalMesh, ReadHorzMesh, Mesh
-    using Dates, YAML, NCDatasets, UnPack, Statistics, Logging
+   
+    using Dates, YAML, NCDatasets, UnPack, Statistics, Logging, KernelAbstractions
     
-    using .MPASMesh    
     # include infrastrcutre code 
     # (Should all of this just be it's own module which is imported here?)
     include("infra/Config.jl")
-    #include("infra/Mesh.jl")
     include("infra/TimeManager.jl")
-    #include("infra/ModelSetup.jl")
     include("infra/MPASMesh/MPASMesh.jl")
+    include("infra/ModelSetup.jl")
 
 
     #include("ocn/Operators.jl")
-    #include("ocn/PrognosticVars.jl")
-    #include("ocn/DiagnosticVars.jl")
+    include("ocn/PrognosticVars.jl")
+    include("ocn/DiagnosticVars.jl")
+    
+    # This infrastrcutre code is lower down b/c it depends on Prog/Diag structures 
+    # for now, so those have to be defined before it can be included
+    include("infra/OutPut.jl")
 
-    #include("infra/OutPut.jl")
+    include("ocn/Tendencies/TendencyVars.jl")
+    include("ocn/Tendencies/normalVelocity.jl")
+    include("ocn/Tendencies/layerThickness.jl")
 
-    #include("ocn/Tendencies/TendencyVars.jl")
-    #include("ocn/Tendencies/normalVelocity.jl")
-    #include("ocn/Tendencies/layerThickness.jl")
-
-    #include("forward/init.jl")
-    #include("forward/time_integration.jl")
-    #
-    #include("Architectures.jl")
+    include("forward/init.jl")
+    include("forward/time_integration.jl")
+    
+    include("Architectures.jl")
+    
+    ###
+    ### Needed so we can export names from sub-modules at the top level
+    ###
+    using .MPASMesh    
 end

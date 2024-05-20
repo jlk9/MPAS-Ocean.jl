@@ -11,14 +11,21 @@ function write_netcdf(Setup::ModelSetup,
     # create the netCDF dataset
     ds = NCDataset(output_filename,"c")
     
+    nCells, = size(mesh.HorzMesh.PrimaryCells)
+    nEdges, = size(mesh.HorzMesh.Edges)
+    nVertices, = size(mesh.HorzMesh.DualCells)
+    nVertLevels = mesh.VertMesh.nVertLevels
+    maxEdges = 6
+    TWO = 2
+
     # hardcode everything for now out of convience
     defDim(ds,"time",1)
-    defDim(ds,"nCells",mesh.nCells)
-    defDim(ds,"nEdges",mesh.nEdges)
-    defDim(ds,"nVertices",mesh.nVertices)
-    defDim(ds,"nVertLevels",mesh.nVertLevels)
-    defDim(ds,"maxEdges",mesh.maxEdges)
-    defDim(ds,"TWO",mesh.TWO)
+    defDim(ds,"nCells", nCells)
+    defDim(ds,"nEdges", nEdges)
+    defDim(ds,"nVertices", nVertices)
+    defDim(ds,"nVertLevels", nVertLevels)
+    defDim(ds,"maxEdges", maxEdges)
+    defDim(ds,"TWO", TWO)
    
     dt = convert(Float64,Second(clock.timeStep).value) 
     # define timestep as global attribute
@@ -57,24 +64,24 @@ function write_netcdf(Setup::ModelSetup,
     
     # dump the variables into the dataset. 
     xtime[:] = Dates.value(Second(clock.currTime - clock.startTime))
-    xCell[:] = mesh.xCell
-    yCell[:] = mesh.yCell
-    xEdge[:] = mesh.xEdge
-    yEdge[:] = mesh.yEdge
-    xVertex[:] = mesh.xVertex
-    yVertex[:] = mesh.yVertex
+    xCell[:] = mesh.HorzMesh.PrimaryCells.xᶜ
+    yCell[:] = mesh.HorzMesh.PrimaryCells.yᶜ
+    xEdge[:] = mesh.HorzMesh.Edges.xᵉ
+    yEdge[:] = mesh.HorzMesh.Edges.yᵉ
+    xVertex[:] = mesh.HorzMesh.DualCells.xᵛ
+    yVertex[:] = mesh.HorzMesh.DualCells.yᵛ
     
-    dcEdge[:] = mesh.dcEdge
-    areaCell[:] = mesh.areaCell
-    angleEdge[:] = mesh.angleEdge
-    areaTriangle[:] = mesh.areaTriangle
+    dcEdge[:] = mesh.HorzMesh.Edges.dₑ
+    areaCell[:] = mesh.HorzMesh.PrimaryCells.AC
+    #angleEdge[:] = mesh.angleEdge
+    areaTriangle[:] = mesh.HorzMesh.DualCells.AT
     
-    edgeSignOnCell[:] = mesh.edgeSignOnCell
-    nEdgesOnCell[:] = mesh.nEdgesOnCell
-    nEdgesOnEdge[:] = mesh.nEdgesOnEdge
-    cellsOnEdge[:] = mesh.cellsOnEdge
-    verticesOnCell[:,:] = mesh.verticesOnCell
-    verticesOnEdge[:,:] = mesh.verticesOnEdge
+    #edgeSignOnCell[:] = mesh.HorzMesh.PrimaryCells.ESoC
+    nEdgesOnCell[:] = mesh.HorzMesh.PrimaryCells.nEoC
+    nEdgesOnEdge[:] = mesh.HorzMesh.Edges.nEoE
+    #cellsOnEdge[:] = mesh.HorzMesh.Edges.CoE
+    #verticesOnCell[:,:] = mesh.HorzMesh.PrimaryCells.VoC
+    #verticesOnEdge[:,:] = mesh.HorzMesh.Edges.VoE
     
     ssh[:,:] = Prog.ssh[:,end]
     layerThickness[:,:,:] = Prog.layerThickness[:,:,end] 

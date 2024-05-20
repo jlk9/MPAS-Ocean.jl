@@ -31,19 +31,31 @@ end
 function pressure_gradient_tendency!(Mesh::Mesh,
                                      ssh,
                                      tendNormalVelocity)
-    
-    @unpack nEdges = Mesh 
-    @unpack maxLevelEdgeTop, dcEdge = Mesh 
-    @unpack cellsOnEdge, boundaryEdge = Mesh 
+
+    @unpack HorzMesh, VertMesh = Mesh 
+   
+    # global index
+    nEdges, = size(HorzMesh.Edges)
+    # edge connectivity information 
+    dcEdge = HorzMesh.Edges.dₑ
+    cellsOnEdge = HorzMesh.Edges.CoE
+    # active ocean layers
+    maxLevelEdge = VertMesh.maxLevelEdge 
+
+    #@unpack nedges = mesh 
+    #@unpack maxleveledgetop, dcedge = mesh 
+    #@unpack cellsonedge, boundaryedge = mesh 
 
     @fastmath for iEdge in 1:nEdges
         
-        if boundaryEdge[iEdge] != 0 continue end 
+        # Needed once we move past doubly periodic and/or planar meshes
+        #if boundaryEdge[iEdge] != 0 continue end 
         
-        iCell1 = cellsOnEdge[1,iEdge]
-        iCell2 = cellsOnEdge[2,iEdge]
+        # different indexing b/c SoA requires array of tuples
+        iCell1 = cellsOnEdge[iEdge][1]
+        iCell2 = cellsOnEdge[iEdge][2]
 
-        @fastmath for k in 1:maxLevelEdgeTop[iEdge]
+        @fastmath for k in 1:maxLevelEdge.Top[iEdge]
             tendNormalVelocity[k,iEdge] += 9.80616 *
                 (ssh[iCell1] - ssh[iCell2]) / dcEdge[iEdge] 
         end 
@@ -54,20 +66,36 @@ function coriolis_force_tendency!(Mesh::Mesh,
                                   normalVelocity, 
                                   tendNormalVelocity)
     
-    @unpack nEdges, nEdgesOnEdge = Mesh 
-    @unpack maxLevelEdgeTop, weightsOnEdge, fEdge = Mesh 
-    @unpack cellsOnEdge, boundaryEdge, edgesOnEdge = Mesh 
+    @unpack HorzMesh, VertMesh = Mesh 
+   
+    # global index
+    nEdges, = size(HorzMesh.Edges)
+    # edge connectivity information 
+    nEdgesOnEdge = HorzMesh.Edges.nEoE
+    cellsOnEdge = HorzMesh.Edges.CoE
+    edgesOnEdge = HorzMesh.Edges.EoE
+    weightsOnEdge = HorzMesh.Edges.WoE 
+    # active ocean layers
+    maxLevelEdge = VertMesh.maxLevelEdge
+    # physcial quantities defined on mesh
+    fEdge = HorzMesh.Edges.fᵉ
+
+    #@unpack nEdges, nEdgesOnEdge = Mesh 
+    #@unpack maxLevelEdgeTop, weightsOnEdge, fEdge = Mesh 
+    #@unpack cellsOnEdge, boundaryEdge, edgesOnEdge = Mesh 
 
     @fastmath for iEdge in 1:nEdges, i in 1:nEdgesOnEdge[iEdge]
         
-        if boundaryEdge[iEdge] != 0 continue end 
+        # Needed once we move past doubly periodic and/or planar meshes
+        #if boundaryEdge[iEdge] != 0 continue end 
 
-        eoe = edgesOnEdge[i,iEdge]
+        # different indexing b/c SoA requires array of tuples
+        eoe = edgesOnEdge[iEdge][i]
         
         if eoe == 0 continue end 
 
-        @fastmath for k in 1:maxLevelEdgeTop[iEdge]
-            tendNormalVelocity[k,iEdge] += weightsOnEdge[i,iEdge] *
+        @fastmath for k in 1:maxLevelEdge.Top[iEdge]
+            tendNormalVelocity[k,iEdge] += weightsOnEdge[iEdge][i] *
                                            normalVelocity[k, eoe] *
                                            fEdge[eoe]
         end

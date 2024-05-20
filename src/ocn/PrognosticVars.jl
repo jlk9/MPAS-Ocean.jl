@@ -62,8 +62,12 @@ function PrognosticVars_init(config::GlobalConfig,
     # Read the number of desired time levels from the config file 
     timeIntegrationConfig = ConfigGet(config.namelist, "time_integration")
     nTimeLevels = ConfigGet(timeIntegrationConfig, "config_number_of_time_levels")
-     
-    @unpack nVertLevels, nCells, nEdges= mesh
+    
+    nCells, = size(mesh.HorzMesh.PrimaryCells)
+    nEdges, = size(mesh.HorzMesh.Edges)
+    nVertLevels = mesh.VertMesh.nVertLevels
+
+    #@unpack nVertLevels, nCells, nEdges= mesh
 
     input = NCDataset(input_filename)
 
@@ -79,7 +83,7 @@ function PrognosticVars_init(config::GlobalConfig,
     
     # return instance of Prognostic struct 
     PrognosticVars(Adapt.adapt(backend, ssh),
-                   Adapt.adapt(normalVelocity), 
-                   Adapt.adapt(layerThickness))
+                   Adapt.adapt(backend, normalVelocity), 
+                   Adapt.adapt(backend, layerThickness))
 end 
 

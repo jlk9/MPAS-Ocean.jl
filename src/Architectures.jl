@@ -24,7 +24,7 @@ function check_typeof_args(args::Tuple)
     end
 end
 
-function check_agrs_backend(args::Tuple)
+function check_args_backend(args::Tuple)
     # check that all args are on the same backend, assumes the 
     # args has a get_backend method (e.g. arg <: AbstratArray)
     if !allequal(KA.get_backend.(args))
