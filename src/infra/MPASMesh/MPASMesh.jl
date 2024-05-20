@@ -1,7 +1,11 @@
 module MPASMesh
- 
+
+# MPASMesh
 export Mesh
-export Cell, Edge, Vertex
+# VertMesh.jl
+export VerticalMesh
+# HorzMesh.jl
+export Cell, Edge, Vertex, ReadHorzMesh
 
 using Accessors
 using NCDatasets
@@ -11,11 +15,6 @@ using KernelAbstractions
 import Adapt
 
 const KA = KernelAbstractions
-
-# VertMesh.jl
-export VerticalMesh
-# HorzMesh.jl
-export ReadHorzMesh
 
 struct Mesh{HM,VM}
     HorzMesh::HM

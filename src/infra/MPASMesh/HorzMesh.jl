@@ -74,9 +74,16 @@ struct eᵢ{FT, IT, TWO, ME2}
     # TWO --> (2)
     # ME2 --> (M)ax (E)dges * (2) 
 
+    # coordinate information
     xᵉ::FT   # X coordinate of edge midpoints in cartesian space
     yᵉ::FT   # Y coordinate of edge midpoints in cartesian space
+    zᵉ::FT   # Z coordinate of edge midpoints in cartesian space
    
+    # coriolis parameter
+    fᵉ::FT 
+
+    nEoE::IT # (n)umber of (E)dges (o) (E)dge
+
     # intra edge connectivity
     CoE::NTuple{TWO, IT} # (C)ells    (o)n (E)dge
     VoE::NTuple{TWO, IT} # (V)ertices (o)n (E)dge
@@ -99,9 +106,14 @@ struct Pᵢ{FT, IT, ME}
     # IT --> (I)int (T)ype
     # ME --> (M)ax (E)dges
     
+    # coordinate information
     xᶜ::FT   # X coordinate of cell centers in cartesian space
     yᶜ::FT   # Y coordinate of cell centers in cartesian space
+    zᶜ::FT   # Z coordinate of cell centers in cartesina space
     
+    # coriolis parameter
+    fᶜ::FT 
+
     nEoC::IT # (n)umber of (E)dges (o)n (C)ell 
 
     # intra cell connectivity
@@ -122,10 +134,15 @@ struct Dᵢ{FT, IT, VD, ME}
     # IT --> (I)int (T)ype
     # VD --> (V)ertex (D)egree
     # ME --> (M)ax (E)dges
-
-    xᵛ::FT 
-    yᵛ::FT 
     
+    # coordinate information
+    xᵛ::FT   # X coordinate of vertices in cartesian space
+    yᵛ::FT   # Y coordinate of vertices in cartesian space
+    zᵛ::FT   # Z coordinate of vertices in cartesina space
+    
+    # coriolis parameter
+    fᵛ::FT 
+
     # intra vertex connecivity 
     EoV::NTuple{VD, IT} # (E)dges (o)n (V)ertex; set of edges that define the boundary $D_i$
     CoV::NTuple{VD, IT} # (C)ells (o)n (V)ertex 
@@ -148,7 +165,12 @@ function readPrimaryMesh(ds)
     # coordinate data 
     xᶜ = ds["xCell"][:]
     yᶜ = ds["yCell"][:]
+    zᶜ = ds["zCell"][:]
     
+    fᶜ = ds["fCell"][:]
+    ## initalize coriolis as zero b/c not included in the base mesh
+    #fᶜ = zeros(eltype(xᶜ), nCells)
+
     nEoC = ds["nEdgesOnCell"][:]
     
     # intra connectivity
@@ -162,8 +184,8 @@ function readPrimaryMesh(ds)
     # Cell area
     AC = ds["areaCell"][:]
 
-    StructArray{Pᵢ}((xᶜ = xᶜ, yᶜ = yᶜ, AC = AC,
-                     EoC = EoC, VoC = VoC, CoC = CoC,
+    StructArray{Pᵢ}((xᶜ = xᶜ, yᶜ = yᶜ, zᶜ = zᶜ, fᶜ = fᶜ, 
+                     AC = AC, EoC = EoC, VoC = VoC, CoC = CoC,
                      nEoC = nEoC, ESoC = ESoC))
 end
 
@@ -176,7 +198,12 @@ function readDualMesh(ds)
     # coordinate data 
     xᵛ = ds["xVertex"][:]
     yᵛ = ds["yVertex"][:]
+    zᵛ = ds["zVertex"][:]
     
+    fᵛ = ds["fVertex"][:]
+    ## initalize coriolis as zero b/c not included in the base mesh
+    #fᵛ = zeros(eltype(xᵛ), nVertices)
+
     # intra connectivity
     EoV = stack(ds["edgesOnVertex"], nVertices)
     CoV = stack(ds["cellsOnVertex"], nVertices)
@@ -189,8 +216,8 @@ function readDualMesh(ds)
     # Triangle area
     AT = ds["areaTriangle"][:]
 
-    StructArray{Dᵢ}((xᵛ = xᵛ, yᵛ = yᵛ, AT = AT,
-                     EoV = EoV, CoV = CoV, ESoV = ESoV))
+    StructArray{Dᵢ}((xᵛ = xᵛ, yᵛ = yᵛ, zᵛ = zᵛ, fᵛ = fᵛ,
+                     AT = AT, EoV = EoV, CoV = CoV, ESoV = ESoV))
 end 
 
 function readEdgeInfo(ds)
@@ -198,6 +225,11 @@ function readEdgeInfo(ds)
     # coordinate data 
     xᵉ = ds["xEdge"][:]
     yᵉ = ds["yEdge"][:]
+    zᵉ = ds["zEdge"][:]
+
+    fᵉ = ds["fEdge"][:]
+        
+    nEoE = ds["nEdgesOnEdge"][:]
 
     # intra connectivity
     CoE = stack(ds["cellsOnEdge"], ds.dim["nEdges"])
@@ -211,8 +243,8 @@ function readEdgeInfo(ds)
     dₑ = ds["dcEdge"][:]
 
         
-    StructArray{eᵢ}(xᵉ = xᵉ, yᵉ = yᵉ,
-                    CoE = CoE, VoE = VoE, EoE = EoE, WoE = WoE,
+    StructArray{eᵢ}(xᵉ = xᵉ, yᵉ = yᵉ, zᵉ = zᵉ, fᵉ = fᵉ,
+                    nEoE = nEoE, CoE = CoE, VoE = VoE, EoE = EoE, WoE = WoE,
                     lₑ = lₑ, dₑ = dₑ)
 end
 

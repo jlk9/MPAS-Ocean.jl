@@ -19,8 +19,8 @@ mutable struct ActiveLevels{IV}
     Bot::IV
 
     function ActiveLevels(dim, eltype, backend)
-        Top = KA.zeros(backend, eltype, dim)
-        Bot = KA.zeros(backend, eltype, dim)
+        Top = KA.ones(backend, eltype, dim)
+        Bot = KA.ones(backend, eltype, dim)
 
         new{typeof(Top)}(Top, Bot)
     end
