@@ -19,7 +19,7 @@ function ocn_run(config_fp)
     # this is hardcoded for now, but should really be set accordingly in the 
     # yaml file
     #dt = floor(3.0 * mean(mesh.dcEdge) / 1e3)
-    dcEdge = mesh.HorzMesh.Edges.dₑ
+    dcEdge = mesh.HorzMesh.Edges.dcEdge
     dt = floor(2 * (mean(dcEdge) / 1e3) * mean(dcEdge) / 200e3) 
     changeTimeStep!(Setup.timeManager, Second(dt))
     

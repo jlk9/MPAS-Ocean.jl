@@ -28,11 +28,11 @@ mutable struct ActiveLevels{IV}
 end
 
 function ActiveLevels{Edge}(mesh; backend=KA.CPU())
-    ActiveLevels(length(mesh.Edges), Int32, backend)
+    ActiveLevels(mesh.Edges.nEdges, Int32, backend)
 end
 
 function ActiveLevels{Vertex}(mesh; backend=KA.CPU())
-    ActiveLevels(length(mesh.DualCells), Int32, backend)
+    ActiveLevels(mesh.DualCells.nVertices, Int32, backend)
 end
 
 function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())

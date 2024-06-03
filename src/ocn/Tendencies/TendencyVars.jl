@@ -50,12 +50,13 @@ end
 
 function TendencyVars(Config::GlobalConfig, Mesh::Mesh, backend=KA.CPU())
         
-    nCells, = size(Mesh.HorzMesh.PrimaryCells)
-    nEdges, = size(Mesh.HorzMesh.Edges)
-    nVertLevels = Mesh.VertMesh.nVertLevels
+    @unpack HorzMesh, VertMesh = Mesh    
+    @unpack PrimaryCells, Edges = HorzMesh
 
-    #@unpack nVertLevels, nCells, nEdges= Mesh
-    
+    nEdges = Edges.nEdges
+    nCells = PrimaryCells.nCells
+    nVertLevels = VertMesh.nVertLevels
+
     # create zero vectors to store tendecy vars on the desired backend
     tendNormalVelocity = KA.zeros(backend, Float64, nVertLevels, nEdges) 
     tendLayerThickness = KA.zeros(backend, Float64, nVertLevels, nCells)
@@ -89,6 +90,3 @@ function axb!(a::Array{T,2}, x::T, b::Array{T,2}) where {T<:AbstractFloat}
     end
 end 
 
-# TODO: Would be good to write out some information about the shared 
-#       interface of `computeTendency!` and what is needed for it to 
-#       dispatch correctly. 

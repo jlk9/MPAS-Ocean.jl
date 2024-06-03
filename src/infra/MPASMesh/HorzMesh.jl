@@ -1,4 +1,5 @@
 using CUDA
+using UnPack
 using Accessors
 using NCDatasets
 using StructArrays
@@ -41,10 +42,10 @@ struct Edge end
 
 A struct, comprised of SoA, describing a 2-D TRiSK mesh
 """
-struct HorzMesh{PCT, DCT, EST}
-    PrimaryCells::StructArray{PCT}
-    DualCells::StructArray{DCT}
-    Edges::StructArray{EST}
+struct HorzMesh{PCT, DCT, ET}
+    PrimaryCells::PCT
+    DualCells::DCT
+    Edges::ET
 end
 
 """
@@ -59,33 +60,37 @@ end
 ### Nodes of elements
 ###
 
-# this is a line segment
-struct eᵢ{FT, IT, TWO, ME2} 
-    # FT  --> (F)loat (T)ype
-    # IT  --> (I)int (T)ype
-    # TWO --> (2)
-    # ME2 --> (M)ax (E)dges * (2) 
+# these are line segments
+@kwdef struct Edges{I, FV, IV, FM, IM} 
+    # I   --> (I)nt
+    # FT  --> (F)loat (V)ector 
+    # IT  --> (I)int  (V)ector 
+    # FM  --> (F)loat (M)atrix  
+    # IM  --> (I)int  (M)atrix  
+    
+    # dimension info
+    nEdges::I
 
     # coordinate information
-    xᵉ::FT   # X coordinate of edge midpoints in cartesian space
-    yᵉ::FT   # Y coordinate of edge midpoints in cartesian space
-    zᵉ::FT   # Z coordinate of edge midpoints in cartesian space
+    xᵉ::FV   # X coordinates of edge midpoints in cartesian space
+    yᵉ::FV   # Y coordinates of edge midpoints in cartesian space
+    zᵉ::FV   # Z coordinates of edge midpoints in cartesian space
    
     # coriolis parameter
-    fᵉ::FT 
+    fᵉ::FV 
 
-    nEoE::IT # (n)umber of (E)dges (o) (E)dge
+    nEdgesOnEdge::IV # (n)umber of (E)dges (o) (E)dge
 
     # intra edge connectivity
-    CoE::NTuple{TWO, IT} # (C)ells    (o)n (E)dge
-    VoE::NTuple{TWO, IT} # (V)ertices (o)n (E)dge
+    cellsOnEdge::IM    # (C)ells    (o)n (E)dge
+    verticesOnEdge::IM # (V)ertices (o)n (E)dge
 
     # inter edge connectivity
-    EoE::NTuple{ME2, IT} # (E)dges    (o)n (E)dge
-    WoE::NTuple{ME2, FT} # (W)eights  (o)n (E)dge; reconstruction weights associated w/ EoE
+    edgesOnEdge::IM   # (E)dges   (o)n (E)dge
+    weightsOnEdge::FM # (W)eights (o)n (E)dge; reconstruction weights associated w/ EoE
 
-    lₑ::FT
-    dₑ::FT 
+    dvEdge::FV
+    dcEdge::FV 
 end
 
 ###
@@ -93,57 +98,66 @@ end
 ###
 
 # (P)rimary mesh cell
-struct Pᵢ{FT, IT, ME} 
-    # FT --> (F)loat (T)ype
-    # IT --> (I)int (T)ype
-    # ME --> (M)ax (E)dges
+@kwdef struct PrimaryCells{I, FV, IV, IM} 
+    # I   --> (I)nt
+    # FV  --> (F)loat (V)ector 
+    # IV  --> (I)int  (V)ector 
+    # IM  --> (I)int  (M)atrix  
     
+    # dimension info
+    nCells::I
+    maxEdges::I
+
     # coordinate information
-    xᶜ::FT   # X coordinate of cell centers in cartesian space
-    yᶜ::FT   # Y coordinate of cell centers in cartesian space
-    zᶜ::FT   # Z coordinate of cell centers in cartesina space
+    xᶜ::FV   # X coordinates of cell centers in cartesian space
+    yᶜ::FV   # Y coordinates of cell centers in cartesian space
+    zᶜ::FV   # Z coordinates of cell centers in cartesina space
     
     # coriolis parameter
-    fᶜ::FT 
+    fᶜ::FV 
 
-    nEoC::IT # (n)umber of (E)dges (o)n (C)ell 
+    nEdgesOnCell::IV # (n)umber of (E)dges (o)n (C)ell 
 
     # intra cell connectivity
-    EoC::NTuple{ME, IT} # (E)dges    (o)n (C)ell; set of edges that define the boundary $P_i$
-    VoC::NTuple{ME, IT} # (V)ertices (o)n (C)ell
+    edgesOnCell::IM    # (E)dges    (o)n (C)ell; set of edges that define the boundary $P_i$
+    verticesOnCell::IM # (V)ertices (o)n (C)ell
 
     # inter cell connectivity
-    CoC::NTuple{ME, IT} # (C)ells    (o)n (C)ell
-    ESoC::NTuple{ME, IT} # (E)dge (S)ign (o)n (C)ell; 
+    cellsOnCell::IM    # (C)ells    (o)n (C)ell
+    edgeSignOnCell::IM # (E)dge (S)ign (o)n (C)ell; 
 
     # area of cell 
-    AC::FT
+    areaCell::FV
 end
 
 # (D)ual mesh cell
-struct Dᵢ{FT, IT, VD, ME}
-    # FT --> (F)loat (T)ype
-    # IT --> (I)int (T)ype
-    # VD --> (V)ertex (D)egree
-    # ME --> (M)ax (E)dges
+@kwdef struct DualCells{I, FV, IM}
+    # I   --> (I)nt
+    # FV  --> (F)loat (V)ector 
+    # IV  --> (I)int  (V)ector 
+    # IM  --> (I)int  (M)atrix  
     
+    # dimension info
+    nVertices::I
+    vertexDegree::I
+
     # coordinate information
-    xᵛ::FT   # X coordinate of vertices in cartesian space
-    yᵛ::FT   # Y coordinate of vertices in cartesian space
-    zᵛ::FT   # Z coordinate of vertices in cartesina space
+    xᵛ::FV   # X coordinate of vertices in cartesian space
+    yᵛ::FV   # Y coordinate of vertices in cartesian space
+    zᵛ::FV   # Z coordinate of vertices in cartesina space
     
     # coriolis parameter
-    fᵛ::FT 
+    fᵛ::FV 
 
     # intra vertex connecivity 
-    EoV::NTuple{VD, IT} # (E)dges (o)n (V)ertex; set of edges that define the boundary $D_i$
-    CoV::NTuple{VD, IT} # (C)ells (o)n (V)ertex 
+    edgesOnVertex::IM # (E)dges (o)n (V)ertex; set of edges that define the boundary $D_i$
+    cellsOnVertex::IM # (C)ells (o)n (V)ertex 
     
     # inter vertex connecivity
-    ESoV::NTuple{ME, IT} #(E)dge (S)ign (o)n Vertex
+    edgeSignOnVertex::IM #(E)dge (S)ign (o)n Vertex
 
     # area of triangle 
-    AT::FT
+    areaTriangle::FV
 end 
 
 stack(arr, N) = [Tuple(arr[:,i]) for i in 1:N]
@@ -163,22 +177,29 @@ function readPrimaryMesh(ds)
     ## initalize coriolis as zero b/c not included in the base mesh
     #fᶜ = zeros(eltype(xᶜ), nCells)
 
-    nEoC = ds["nEdgesOnCell"][:]
     
     # intra connectivity
-    EoC = stack(ds["edgesOnCell"], nCells)
-    VoC = stack(ds["verticesOnCell"], nCells)
+    edgesOnCell = ds["edgesOnCell"][:,:]
+    verticesOnCell = ds["verticesOnCell"][:,:]
+
     # inter connectivity
-    CoC = stack(ds["cellsOnCell"], nCells)
+    nEdgesOnCell = ds["nEdgesOnCell"][:]
+    cellsOnCell = ds["cellsOnCell"][:,:]
+
     # edge sign on cell, empty for now will be popupated later
-    ESoC = stack(zeros(eltype(nEoC), (maxEdges, nCells)), nCells)
+    edgeSignOnCell = zeros(eltype(nEdgesOnCell), (maxEdges, nCells))
 
     # Cell area
-    AC = ds["areaCell"][:]
+    areaCell = ds["areaCell"][:]
 
-    StructArray{Pᵢ}((xᶜ = xᶜ, yᶜ = yᶜ, zᶜ = zᶜ, fᶜ = fᶜ, 
-                     AC = AC, EoC = EoC, VoC = VoC, CoC = CoC,
-                     nEoC = nEoC, ESoC = ESoC))
+    PrimaryCells(nCells = nCells, maxEdges = maxEdges,
+                 xᶜ = xᶜ, yᶜ = yᶜ, zᶜ = zᶜ, fᶜ = fᶜ, 
+                 areaCell = areaCell,
+                 edgesOnCell = edgesOnCell,
+                 verticesOnCell = verticesOnCell,
+                 cellsOnCell = cellsOnCell,
+                 nEdgesOnCell = nEdgesOnCell,
+                 edgeSignOnCell = edgeSignOnCell)
 end
 
 function readDualMesh(ds)
@@ -186,6 +207,7 @@ function readDualMesh(ds)
     # get dimension info 
     nVertices = ds.dim["nVertices"] 
     maxEdges  = ds.dim["maxEdges"]
+    vertexDegree = ds.dim["vertexDegree"]
 
     # coordinate data 
     xᵛ = ds["xVertex"][:]
@@ -197,22 +219,29 @@ function readDualMesh(ds)
     #fᵛ = zeros(eltype(xᵛ), nVertices)
 
     # intra connectivity
-    EoV = stack(ds["edgesOnVertex"], nVertices)
-    CoV = stack(ds["cellsOnVertex"], nVertices)
+    edgesOnVertex = ds["edgesOnVertex"][:,:]
+    cellsOnVertex = ds["cellsOnVertex"][:,:]
     
     # get the integer type from the NetCDF file
     int_type = eltype(ds["edgesOnVertex"])
     # edge sign on vertex, empty for now will be popupated later
-    ESoV = stack(zeros(int_type, (maxEdges, nVertices)), nVertices)
+    edgeSignOnVertex = zeros(int_type, (maxEdges, nVertices))
 
     # Triangle area
-    AT = ds["areaTriangle"][:]
+    areaTriangle = ds["areaTriangle"][:]
 
-    StructArray{Dᵢ}((xᵛ = xᵛ, yᵛ = yᵛ, zᵛ = zᵛ, fᵛ = fᵛ,
-                     AT = AT, EoV = EoV, CoV = CoV, ESoV = ESoV))
+    DualCells(nVertices = nVertices, vertexDegree = vertexDegree,
+              xᵛ = xᵛ, yᵛ = yᵛ, zᵛ = zᵛ, fᵛ = fᵛ,
+              edgesOnVertex = edgesOnVertex,
+              cellsOnVertex = cellsOnVertex,
+              edgeSignOnVertex = edgeSignOnVertex, 
+              areaTriangle = areaTriangle)
 end 
 
 function readEdgeInfo(ds)
+
+    # dimension data
+    nEdges = ds.dim["nEdges"]
 
     # coordinate data 
     xᵉ = ds["xEdge"][:]
@@ -221,75 +250,72 @@ function readEdgeInfo(ds)
 
     fᵉ = ds["fEdge"][:]
         
-    nEoE = ds["nEdgesOnEdge"][:]
+    nEdgesOnEdge = ds["nEdgesOnEdge"][:]
 
     # intra connectivity
-    CoE = stack(ds["cellsOnEdge"], ds.dim["nEdges"])
-    VoE = stack(ds["verticesOnEdge"], ds.dim["nEdges"])
+    cellsOnEdge = ds["cellsOnEdge"][:,:]
+    verticesOnEdge = ds["verticesOnEdge"][:,:]
 
     # inter connectivity
-    EoE = stack(ds["edgesOnEdge"], ds.dim["nEdges"])
-    WoE = stack(ds["weightsOnEdge"], ds.dim["nEdges"])
+    edgesOnEdge = ds["edgesOnEdge"][:,:]
+    weightsOnEdge = ds["weightsOnEdge"][:,:]
 
-    lₑ = ds["dvEdge"][:]
-    dₑ = ds["dcEdge"][:]
+    dvEdge = ds["dvEdge"][:]
+    dcEdge = ds["dcEdge"][:]
 
         
-    StructArray{eᵢ}(xᵉ = xᵉ, yᵉ = yᵉ, zᵉ = zᵉ, fᵉ = fᵉ,
-                    nEoE = nEoE, CoE = CoE, VoE = VoE, EoE = EoE, WoE = WoE,
-                    lₑ = lₑ, dₑ = dₑ)
+    Edges(nEdges = nEdges,
+          xᵉ = xᵉ, yᵉ = yᵉ, zᵉ = zᵉ, fᵉ = fᵉ,
+          nEdgesOnEdge = nEdgesOnEdge,
+          cellsOnEdge = cellsOnEdge,
+          verticesOnEdge = verticesOnEdge,
+          edgesOnEdge = edgesOnEdge,
+          weightsOnEdge = weightsOnEdge,
+          dvEdge = dvEdge,
+          dcEdge = dcEdge)
 end
 
-function signIndexField!(primaryMesh::StructArray{Pᵢ}, edges::StructArray{eᵢ})
+function signIndexField!(primaryCells::PrimaryCells, edges::Edges)
     
-    # create tmp array to store ESoC (b/c struct is immutable)
-    edgeSignOnCell = hcat(collect.(primaryMesh.ESoC)...)
-    
-    # `eachindex`, instead of `enumerate`?
-    @inbounds for (iCell, Cell) in enumerate(primaryMesh), i in 1:Cell.nEoC
+    @unpack cellsOnEdge = edges
+    @unpack nCells, edgeSignOnCell, nEdgesOnCell, edgesOnCell = primaryCells
+
+    @inbounds for iCell in 1:nCells, i in 1:nEdgesOnCell[iCell]
          
-        iEdge = Cell.EoC[i]
+        iEdge = edgesOnCell[i, iCell]
         
         # vector points from cell 1 to cell 2
-        if iCell == edges[iEdge].CoE[1]
-            edgeSignOnCell[i,iCell] = -1
+        if iCell == cellsOnEdge[1, iEdge]
+            edgeSignOnCell[i, iCell] = -1
         else 
-            edgeSignOnCell[i,iCell] = 1
+            edgeSignOnCell[i, iCell] = 1
         end 
     
         # PrimaryCell struct is immutable so need to use Accessor package,
         # convert mutable array to the immutable NTuple type of a Primary Cell 
-        @reset Cell.ESoC = typeof(Cell.ESoC)(edgeSignOnCell[:,iCell]) 
-        # SoA package creates a view of the parent arrays
-        # https://juliaarrays.github.io/StructArrays.jl/stable/counterintuitive
-        primaryMesh[iCell] = Cell
+        @reset primaryCells.edgeSignOnCell = edgeSignOnCell
     end    
 end 
 
-function signIndexField!(dualMesh::StructArray{Dᵢ}, edges::StructArray{eᵢ})
+function signIndexField!(dualMesh::DualCells, edges::Edges)
     
-    # vertex Degree (3); constant for all dual cells [this is hacky...]
-    vertexDegree = length(dualMesh[1].EoV)
-    # create tmp array to store ESoC (b/c struct is immutable)
-    edgeSignOnVertex = hcat(collect.(dualMesh.ESoV)...)
+    @unpack verticesOnEdge = edges
+    @unpack vertexDegree, nVertices, edgeSignOnVertex, edgesOnVertex = dualMesh 
 
-    @inbounds for (iVertex, Vertex) in enumerate(dualMesh), i in 1:vertexDegree
+    @inbounds for iVertex in 1:nVertices, i in 1:vertexDegree[iVertex]
          
-        iEdge = Vertex.EoV[i]
+        iEdge = edgesOnVertex[i, iVertex]
         
         # vector points from cell 1 to cell 2
-        if iVertex == edges[iEdge].VoE[1]
-            edgeSignOnVertex[i,iVertex] = -1
+        if iVertex == verticesOnEdge[1, iEdge]
+            edgeSignOnVertex[i, iVertex] = -1
         else 
-            edgeSignOnVertex[i,iVertex] = 1
+            edgeSignOnVertex[i, iVertex] = 1
         end 
     
         # DualCell struct is immutable so need to use Accessor package,
         # convert mutable array to the immutable NTuple type of a Dual Cell 
-        @reset Vertex.ESoV = typeof(Vertex.ESoV)(edgeSignOnVertex[:,iVertex]) 
-        # SoA package creates a view of the parent arrays
-        # https://juliaarrays.github.io/StructArrays.jl/stable/counterintuitive
-        dualMesh[iVertex] = Vertex
+        @reset dualMesh.edgeSignOnVertex = edgeSignOnVertex
     end    
 end 
 

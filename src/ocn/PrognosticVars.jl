@@ -63,11 +63,12 @@ function PrognosticVars_init(config::GlobalConfig,
     timeIntegrationConfig = ConfigGet(config.namelist, "time_integration")
     nTimeLevels = ConfigGet(timeIntegrationConfig, "config_number_of_time_levels")
     
-    nCells, = size(mesh.HorzMesh.PrimaryCells)
-    nEdges, = size(mesh.HorzMesh.Edges)
-    nVertLevels = mesh.VertMesh.nVertLevels
+    @unpack HorzMesh, VertMesh = mesh    
+    @unpack PrimaryCells, Edges = HorzMesh
 
-    #@unpack nVertLevels, nCells, nEdges= mesh
+    nEdges = Edges.nEdges
+    nCells = PrimaryCells.nCells
+    nVertLevels = VertMesh.nVertLevels
 
     input = NCDataset(input_filename)
 

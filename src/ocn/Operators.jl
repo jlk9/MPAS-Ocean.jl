@@ -11,26 +11,30 @@ using KernelAbstractions
 """
 @kernel function DivergenceOnCell(@Const(nEdgesOnCell), 
                                   @Const(edgesOnCell),
+                                  @Const(maxLevelEdgeTop),
                                   @Const(edgeSignOnCell),
                                   @Const(dvEdge),
                                   @Const(areaCell),
                                   @Const(VecEdge),
                                   DivCell)
+
     iCell = @index(Global, Linear)
     
     # get inverse cell area
     invArea = 1. / areaCell[iCell]
     # create tmp varibale to store div reduction
     div = zero(eltype(DivCell))
-
+    
+    # loop over number of edges in primary cell
     for i in 1:nEdgesOnCell[iCell]
         iEdge = edgesOnCell[i,iCell]
-        # need to add vertical index
-        div -= VecEdge[iEdge] * dvEdge[iEdge] * edgeSignOnCell[i,iCell]
+        # loop over the number of (active) vertical layers
+        for k in 1:maxLevelEdgeTop[iEdge]
+            # ...
+            div -= VecEdge[k,iEdge] * dvEdge[iEdge] * edgeSignOnCell[i,iCell]
     end
     
-    # need to add vertical index
-    DivCell[iCell] = div * invArea
+    DivCell[k,iCell] = div * invArea
 
 end
 

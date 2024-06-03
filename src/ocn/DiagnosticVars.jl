@@ -39,13 +39,14 @@ end
 function DiagnosticVars_init(config::GlobalConfig,
                              Mesh::Mesh,
                              backend=KA.CPU())
+
+    @unpack HorzMesh, VertMesh = Mesh    
+    @unpack PrimaryCells, Edges = HorzMesh
+
+    nEdges = Edges.nEdges
+    nCells = PrimaryCells.nCells
+    nVertLevels = VertMesh.nVertLevels
     
-    nCells, = size(Mesh.HorzMesh.PrimaryCells)
-    nEdges, = size(Mesh.HorzMesh.Edges)
-    nVertLevels = Mesh.VertMesh.nVertLevels
-
-    #@unpack nVertLevels, nCells, nEdges= mesh
-
     inputConfig = ConfigGet(config.streams, "input")
     input_filename = ConfigGet(inputConfig, "filename_template")
 
@@ -103,17 +104,20 @@ function calculate_layerThicknessEdge!(Mesh::Mesh,
         
     @unpack layerThicknessEdge = Diag 
 
-    nEdges, = size(Mesh.HorzMesh.Edges)
-    cellsOnEdge = Mesh.HorzMesh.Edges.CoE
-    maxLevelEdge = Mesh.VertMesh.maxLevelEdge
+    @unpack HorzMesh, VertMesh = Mesh    
+    @unpack Edges = HorzMesh
+
+    @unpack maxLevelEdge = VertMesh 
+    @unpack nEdges, cellsOnEdge = Edges
+
 
     #@unpack nEdges, cellsOnEdge, maxLevelEdgeTop = Mesh
 
     @fastmath for iEdge in 1:nEdges
         
         # different indexing b/c SoA requires array of tuples
-        cell1Index = cellsOnEdge[iEdge][1]
-        cell2Index = cellsOnEdge[iEdge][2]
+        cell1Index = cellsOnEdge[1, iEdge]
+        cell2Index = cellsOnEdge[2, iEdge]
 
         @fastmath for k in 1:maxLevelEdge.Top[iEdge]
             layerThicknessEdge[k,iEdge] = 0.5 * (layerThickness[k,cell1Index] +

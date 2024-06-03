@@ -1,7 +1,7 @@
 function write_netcdf(Setup::ModelSetup,
                       Diag::DiagnosticVars,
                       Prog::PrognosticVars)
-    mesh = Setup.mesh
+    Mesh = Setup.mesh
     clock = Setup.timeManager
     config = Setup.config
 
@@ -11,11 +11,14 @@ function write_netcdf(Setup::ModelSetup,
     # create the netCDF dataset
     ds = NCDataset(output_filename,"c")
     
-    nCells, = size(mesh.HorzMesh.PrimaryCells)
-    nEdges, = size(mesh.HorzMesh.Edges)
-    nVertices, = size(mesh.HorzMesh.DualCells)
-    nVertLevels = mesh.VertMesh.nVertLevels
-    maxEdges = 6
+    @unpack HorzMesh, VertMesh = Mesh    
+    @unpack PrimaryCells, DualCells, Edges = HorzMesh
+
+    nEdges = Edges.nEdges
+    nCells = PrimaryCells.nCells
+    nVertices = DualCells.nVertices
+    nVertLevels = VertMesh.nVertLevels
+    maxEdges = PrimaryCells.maxEdges
     TWO = 2
 
     # hardcode everything for now out of convience
@@ -64,21 +67,21 @@ function write_netcdf(Setup::ModelSetup,
     
     # dump the variables into the dataset. 
     xtime[:] = Dates.value(Second(clock.currTime - clock.startTime))
-    xCell[:] = mesh.HorzMesh.PrimaryCells.xᶜ
-    yCell[:] = mesh.HorzMesh.PrimaryCells.yᶜ
-    xEdge[:] = mesh.HorzMesh.Edges.xᵉ
-    yEdge[:] = mesh.HorzMesh.Edges.yᵉ
-    xVertex[:] = mesh.HorzMesh.DualCells.xᵛ
-    yVertex[:] = mesh.HorzMesh.DualCells.yᵛ
+    xCell[:] = PrimaryCells.xᶜ
+    yCell[:] = PrimaryCells.yᶜ
+    xEdge[:] = Edges.xᵉ
+    yEdge[:] = Edges.yᵉ
+    xVertex[:] = DualCells.xᵛ
+    yVertex[:] = DualCells.yᵛ
     
-    dcEdge[:] = mesh.HorzMesh.Edges.dₑ
-    areaCell[:] = mesh.HorzMesh.PrimaryCells.AC
+    dcEdge[:] = Edges.dcEdge
+    areaCell[:] = PrimaryCells.areaCell
     #angleEdge[:] = mesh.angleEdge
-    areaTriangle[:] = mesh.HorzMesh.DualCells.AT
+    areaTriangle[:] = DualCells.areaTriangle
     
     #edgeSignOnCell[:] = mesh.HorzMesh.PrimaryCells.ESoC
-    nEdgesOnCell[:] = mesh.HorzMesh.PrimaryCells.nEoC
-    nEdgesOnEdge[:] = mesh.HorzMesh.Edges.nEoE
+    nEdgesOnCell[:] = PrimaryCells.nEdgesOnCell
+    nEdgesOnEdge[:] = Edges.nEdgesOnEdge
     #cellsOnEdge[:] = mesh.HorzMesh.Edges.CoE
     #verticesOnCell[:,:] = mesh.HorzMesh.PrimaryCells.VoC
     #verticesOnEdge[:,:] = mesh.HorzMesh.Edges.VoE
@@ -90,7 +93,7 @@ function write_netcdf(Setup::ModelSetup,
     close(ds)
 end
 
-#function io_writeTimetep()
+#function io_writeTimestep()
 #end 
 #
 #function io_finalize(ds)
