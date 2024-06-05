@@ -2,7 +2,8 @@ using Test
 using CUDA
 using UnPack
 using LinearAlgebra
-using MPAS_O: Mesh, ReadMesh, GradientOnEdge,  DivergenceOnCell
+using CUDA: @allowscalar
+using MOKA: HorzMesh, ReadHorzMesh, GradientOnEdge, DivergenceOnCell, Edge, Cell, Vertex
 
 import Adapt
 import Downloads
@@ -11,7 +12,41 @@ import KernelAbstractions as KA
 abstract type TestCase end 
 abstract type PlanarTest <: TestCase end 
 
+atol = 1e-8
+
 on_architecture(backend::KA.Backend, array::AbstractArray) = Adapt.adapt_storage(backend, array)
+
+# this could be improved...
+struct ErrorMeasures{FT}
+    L_two::FT
+    L_inf::FT
+
+    function ErrorMeasures(Numeric, Analytic, mesh, node_location)
+        
+        # Numeric value has a vertical dimension
+        if ndims(Numeric) == 2
+            # only support a single vertical layer for now
+            @assert size(Numeric)[1] == 1
+            # Remove the vertical layer from the Numeric solution
+            Numeric = Numeric[1,:]
+        end
+
+        diff = Analytic - Numeric 
+        area = compute_area(mesh, node_location)
+
+        # compute the norms, with
+        L_inf = norm(diff, Inf) / norm(Analytic, Inf)
+        L_two = norm(diff .* area, 2) / norm(Analytic .* area, Inf)
+    
+        FT = typeof(L_inf)
+
+        new{FT}(L_two, L_inf)
+    end 
+end
+
+compute_area(mesh, ::Type{Cell}) = mesh.PrimaryCells.areaCell
+compute_area(mesh, ::Type{Vertex}) = mesh.DualCells.areaTriangle
+compute_area(mesh, ::Type{Edge}) = mesh.Edges.dcEdge .* mesh.Edges.dvEdge * 0.5
 
 struct TestSetup{FT, AT}
     
@@ -33,25 +68,28 @@ struct TestSetup{FT, AT}
     #    new{FT}(xᶜ, yᶜ, xᵉ, yᵉ, Lx, Ly, EdgeNormalX, EdgeNormalY)
 end 
 
-function TestSetup(mesh::Mesh, ::Type{PlanarTest}; backend=KA.CPU())
+function TestSetup(mesh::HorzMesh, ::Type{PlanarTest}; backend=KA.CPU())
 
-    @unpack xEdge, xCell, yEdge, yCell, angleEdge = mesh
-    
-    FT = eltype(xEdge)
+    @unpack PrimaryCells, Edges = mesh
 
-    #Lx = maximum(xCell) - minimum(xCell)
-    #Ly = maximum(yCell) - minimum(yCell)
-    Lx = round(maximum(xCell))
+    @unpack xᶜ, yᶜ = PrimaryCells 
+    @unpack xᵉ, yᵉ, angleEdge = Edges
+
+    FT = eltype(xᶜ)
+
+    #Lx = maximum(xᶜ) - minimum(xᶜ)
+    #Ly = maximum(yᶜ) - minimum(yᶜ)
+    Lx = round(maximum(xᶜ))
     Ly = sqrt(3.0)/2.0 * Lx
 
     EdgeNormalX = cos.(angleEdge)
     EdgeNormalY = sin.(angleEdge)
 
     return TestSetup(backend, 
-                     on_architecture(backend, xCell),
-                     on_architecture(backend, yCell),
-                     on_architecture(backend, xEdge),
-                     on_architecture(backend, yEdge), 
+                     on_architecture(backend, xᶜ),
+                     on_architecture(backend, yᶜ),
+                     on_architecture(backend, xᵉ),
+                     on_architecture(backend, yᵉ), 
                      Lx, Ly,
                      on_architecture(backend, EdgeNormalX),
                      on_architecture(backend, EdgeNormalY))
@@ -61,9 +99,17 @@ end
 Analytical function (defined as cell centers) 
 """
 function h(test::TestSetup, ::Type{PlanarTest})
+        
     @unpack xᶜ, yᶜ, Lx, Ly = test 
 
-    return @. sin(2.0 * pi * xᶜ / Lx) * sin(2.0 * pi * yᶜ / Ly)
+    nCells = length(xᶜ)
+    ftype = eltype(xᶜ)
+    backend = KA.get_backend(xᶜ)
+    
+    result = KA.zeros(backend, ftype, (1, nCells))
+    result[1,:] = @. sin(2.0 * pi * xᶜ / Lx) * sin(2.0 * pi * yᶜ / Ly)
+
+    return result
 end
 
 """
@@ -115,7 +161,15 @@ function 𝐅ₑ(test::TestSetup, ::Type{TC}) where {TC <: TestCase}
     𝐅ˣᵢ = 𝐅ˣ(test, TC)
     𝐅ʸᵢ = 𝐅ʸ(test, TC)
     
-    return @. EdgeNormalX * 𝐅ˣᵢ + EdgeNormalY * 𝐅ʸᵢ
+    ftype = eltype(EdgeNormalX)
+    nEdges = length(EdgeNormalX)
+    backend = KA.get_backend(EdgeNormalX)
+    
+    result = KA.zeros(backend, ftype, (1, nEdges))
+
+    result[1,:] = @. EdgeNormalX * 𝐅ˣᵢ + EdgeNormalY * 𝐅ʸᵢ
+
+    return result
 end
 
 """
@@ -132,57 +186,64 @@ function ∇hₑ(test::TestSetup, ::Type{TC}) where {TC <: TestCase}
     return @. EdgeNormalX * ∂hᵢ∂x + EdgeNormalY * ∂hᵢ∂y
 end
 
-function gradient!(grad, hᵢ, mesh::Mesh; backend=KA.CPU())
+function gradient!(grad, hᵢ, mesh::HorzMesh; backend=KA.CPU())
     
-    #@unpack cellsOnEdge, dcEdge, nEdges = mesh 
+    @unpack Edges = mesh
+
+    @unpack nEdges, dcEdge, cellsOnEdge = Edges
     
-    # get scalar info out of mesh struct
-    nEdges = mesh.nEdges
-    # move mesh arrays to backend 
-    dcEdge = Adapt.adapt(backend, mesh.dcEdge)
-    cellsOnEdge = Adapt.adapt(backend, mesh.cellsOnEdge)
-    
-    #backend = KA.get_backend(grad)
+    # only testing horizontal mesh, so set up dummy array for verticalLevels
+    maxLevelEdgeTop = KA.ones(backend, eltype(cellsOnEdge), nEdges)
+
     kernel! = GradientOnEdge(backend)
-    kernel!(cellsOnEdge, dcEdge, hᵢ, grad, ndrange=nEdges)
+
+    kernel!(cellsOnEdge, dcEdge, maxLevelEdgeTop, hᵢ, grad, ndrange=nEdges)
 
     KA.synchronize(backend)
 end
 
-function divergence!(div, 𝐅ₑ, mesh::Mesh; backend=KA.CPU())
+function divergence!(div, 𝐅ₑ, mesh::HorzMesh; backend=KA.CPU())
 
-    #@unpack nEdgesOnCell, edgesOnCell, edgeSignOnCell, dvEdge, areaCell, nCells = mesh
+    @unpack PrimaryCells, DualCells, Edges = mesh
+
+    @unpack nEdges, dvEdge = Edges
+    @unpack nCells, nEdgesOnCell = PrimaryCells
+    @unpack edgesOnCell, edgeSignOnCell, areaCell = PrimaryCells
+
+    # only testing horizontal mesh, so set up dummy array for verticalLevels
+    maxLevelEdgeTop = KA.ones(backend, eltype(edgesOnCell), nEdges)
     
-    # get scalar info out of mesh struct
-    nCells = mesh.nCells
-    # move mesh arrays to backend 
-    dvEdge = Adapt.adapt(backend, mesh.dvEdge)
-    areaCell = Adapt.adapt(backend, mesh.areaCell)
-    edgesOnCell = Adapt.adapt(backend, mesh.edgesOnCell)
-    nEdgesOnCell = Adapt.adapt(backend, mesh.nEdgesOnCell) 
-    edgeSignOnCell = Adapt.adapt(backend, mesh.edgeSignOnCell)
-
-    #backend = KA.get_backend(div) 
     kernel! = DivergenceOnCell(backend)
     
-    kernel!(nEdgesOnCell, edgesOnCell, edgeSignOnCell, dvEdge, areaCell, 𝐅ₑ, div, ndrange=nCells)
+    kernel!(nEdgesOnCell,
+            edgesOnCell,
+            maxLevelEdgeTop,
+            edgeSignOnCell,
+            dvEdge,
+            areaCell,
+            𝐅ₑ,
+            div,
+            ndrange=nCells)
 
     KA.synchronize(backend)
 end
 
-lcrc_url="https://web.lcrc.anl.gov/public/e3sm/mpas_standalonedata/mpas-ocean/"
-mesh_fp ="mesh_database/doubly_periodic_5km_50x230km_planar.151218.nc" 
-
-mesh_url = lcrc_url * mesh_fp
+# NOTE: planar doubly periodic meshes on lcrc do not give the expected answers
+#       following Omega devGuide and using a custom generated mesh
+#lcrc_url="https://web.lcrc.anl.gov/public/e3sm/mpas_standalonedata/mpas-ocean/"
+#mesh_fp ="mesh_database/doubly_periodic_20km_1000x2000km_planar.151027.nc"
+#mesh_fp ="mesh_database/doubly_periodic_10km_1000x2000km_planar.151117.nc"
+#mesh_url = lcrc_url * mesh_fp
+#
+mesh_url = "https://gist.github.com/mwarusz/f8caf260398dbe140d2102ec46a41268/raw/e3c29afbadc835797604369114321d93fd69886d/PlanarPeriodic48x48.nc"
 mesh_fn  = "MokaMesh.nc"
 
-#Downloads.download(mesh_url, mesh_fn)
-
-mesh = ReadMesh(mesh_fn)
+Downloads.download(mesh_url, mesh_fn)
 
 #backend = KA.CPU()
 backend = CUDABackend();
-CUDA.allowscalar()
+
+mesh = ReadHorzMesh(mesh_fn; backend=backend)
 setup = TestSetup(mesh, PlanarTest; backend=backend)
 
 ###
@@ -191,11 +252,17 @@ setup = TestSetup(mesh, PlanarTest; backend=backend)
 
 # Scalar field define at cell centers
 Scalar  = h(setup, PlanarTest)
-
-gradNum = KA.zeros(backend, Float64, mesh.nEdges)
+# Calculate analytical gradient of cell centered filed (-> edges)
 gradAnn = ∇hₑ(setup, PlanarTest)
-gradient!(gradNum, Scalar, mesh; backend=backend)
-gradNorm = norm(gradAnn .- gradNum, Inf) / norm(gradNum, Inf)
+# Numerical gradient using KernelAbstractions operator 
+gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
+@allowscalar gradient!(gradNum, Scalar, mesh; backend=backend)
+
+gradError = ErrorMeasures(gradNum, gradAnn, mesh, Edge)
+
+# test
+@test gradError.L_inf ≈ 0.00125026071878552 atol=atol
+@test gradError.L_two ≈ 0.06045450851939962 atol=atol
 
 ###
 ### Divergence Test
@@ -203,11 +270,17 @@ gradNorm = norm(gradAnn .- gradNum, Inf) / norm(gradNum, Inf)
 
 # Edge normal component of vector value field defined at cell edges
 VecEdge = 𝐅ₑ(setup, PlanarTest)
-
-divNum = KA.zeros(backend, Float64, mesh.nCells)
+# Calculate the analytical divergence of field on edges (-> cells)
 divAnn = div𝐅(setup, PlanarTest)
-divergence!(divNum, VecEdge, mesh; backend=backend)
-divNorm = norm(divAnn .- divNum, Inf) / norm(divNum, Inf) 
+# Numerical divergence using KernelAbstractions operator
+divNum = KA.zeros(backend, Float64, (1, mesh.PrimaryCells.nCells))
+@allowscalar divergence!(divNum, VecEdge, mesh; backend=backend)
+
+divError = ErrorMeasures(divNum, divAnn, mesh, Cell)
+
+# test
+@test divError.L_inf ≈ 0.00124886886594453 atol=atol
+@test divError.L_two ≈ 0.02997285278183242 atol=atol
 
 ###
 ### Results Display
@@ -218,8 +291,13 @@ arch = typeof(backend) <: KA.GPU ? "GPU" : "CPU"
 println("\n" * "="^45)
 println("Kernel Abstraction Operator Tests on $arch")
 println("="^45 * "\n")
-println("L∞ norm of Graident  : $gradNorm")
-println("L∞ norm of Divergence: $divNorm")
-print("\n" * "="^45 * "\n")
-
+println("Gradient")
+println("--------")
+println("L∞ norm of error : $(gradError.L_inf)")
+println("L₂ norm of error : $(gradError.L_two)")
+println("\nDivergence")
+println("----------")
+println("L∞ norm of error: $(divError.L_inf)")
+println("L₂ norm of error: $(divError.L_two)")
+println("\n" * "="^45 * "\n")
 

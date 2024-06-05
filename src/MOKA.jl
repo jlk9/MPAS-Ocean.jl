@@ -5,8 +5,12 @@ module MOKA
     export write_netcdf
     
     # MPASMesh 
-    export VerticalMesh, ReadHorzMesh, Mesh
+    export VerticalMesh, ReadHorzMesh, Mesh, HorzMesh, VertMesh,
+           Cell, Edge, Vertex
    
+    # Operators
+    export GradientOnEdge, DivergenceOnCell
+
     using Dates, YAML, NCDatasets, UnPack, Statistics, Logging, KernelAbstractions
     
     # include infrastrcutre code 
@@ -17,7 +21,7 @@ module MOKA
     include("infra/ModelSetup.jl")
 
 
-    #include("ocn/Operators.jl")
+    include("ocn/Operators.jl")
     include("ocn/PrognosticVars.jl")
     include("ocn/DiagnosticVars.jl")
     

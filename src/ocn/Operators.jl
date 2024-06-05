@@ -22,8 +22,9 @@ using KernelAbstractions
     
     # get inverse cell area
     invArea = 1. / areaCell[iCell]
+
     # create tmp varibale to store div reduction
-    div = zero(eltype(DivCell))
+    #div = @localmem eltype(DivCell) (1) 
     
     # loop over number of edges in primary cell
     for i in 1:nEdgesOnCell[iCell]
@@ -31,10 +32,12 @@ using KernelAbstractions
         # loop over the number of (active) vertical layers
         for k in 1:maxLevelEdgeTop[iEdge]
             # ...
-            div -= VecEdge[k,iEdge] * dvEdge[iEdge] * edgeSignOnCell[i,iCell]
+            DivCell[k,iCell] -= VecEdge[k,iEdge] * dvEdge[iEdge] *
+                                edgeSignOnCell[i,iCell] * invArea
+        end
     end
     
-    DivCell[k,iCell] = div * invArea
+    #DivCell[k,iCell] = div * invArea
 
 end
 
@@ -48,6 +51,7 @@ end
 """
 @kernel function GradientOnEdge(@Const(cellsOnEdge), 
                                 @Const(dcEdge), 
+                                @Const(maxLevelEdgeTop),
                                 @Const(ScalarCell), 
                                 GradEdge)
     # global indices over nEdges
@@ -59,18 +63,20 @@ end
     
     # inverse edge spacing for iEdge
     @inbounds InvDcEdge = 1. / dcEdge[iEdge]
-
-    # gradient on edges calculation 
-    GradEdge[iEdge] = InvDcEdge * 
-                      (ScalarCell[jCell2] - ScalarCell[jCell1])
+  
+    for k in 1:maxLevelEdgeTop[iEdge]
+        # gradient on edges calculation 
+        GradEdge[k, iEdge] = InvDcEdge * 
+                             (ScalarCell[k, jCell2] - ScalarCell[k, jCell1])
+    end
 end
 
 
-@doc raw"""
-"""
-@kernel function TangentialReconOnEdge(@Const(nEdgesOnEdge),
-                                       @Const(edgesOnEdge),
-                                       @Const(weightsOnEdge),
-                                       @Const(VecEdge),
-                                       ReconEdge)
-end 
+#@doc raw"""
+#"""
+#@kernel function TangentialReconOnEdge(@Const(nEdgesOnEdge),
+#                                       @Const(edgesOnEdge),
+#                                       @Const(weightsOnEdge),
+#                                       @Const(VecEdge),
+#                                       ReconEdge)
+#end 
