@@ -91,6 +91,7 @@ end
 
     dvEdge::FV
     dcEdge::FV 
+    angleEdge::FV
 end
 
 ###
@@ -173,10 +174,12 @@ function readPrimaryMesh(ds)
     yᶜ = ds["yCell"][:]
     zᶜ = ds["zCell"][:]
     
-    fᶜ = ds["fCell"][:]
-    ## initalize coriolis as zero b/c not included in the base mesh
-    #fᶜ = zeros(eltype(xᶜ), nCells)
-
+    if haskey(ds, "fCell")
+        fᶜ = ds["fCell"][:]
+    else
+        ## initalize coriolis as zero b/c not included in the base mesh
+        fᶜ = zeros(eltype(xᶜ), nCells)
+    end
     
     # intra connectivity
     edgesOnCell = ds["edgesOnCell"][:,:]
@@ -214,9 +217,12 @@ function readDualMesh(ds)
     yᵛ = ds["yVertex"][:]
     zᵛ = ds["zVertex"][:]
     
-    fᵛ = ds["fVertex"][:]
-    ## initalize coriolis as zero b/c not included in the base mesh
-    #fᵛ = zeros(eltype(xᵛ), nVertices)
+    if haskey(ds, "fVertex")
+        fᵛ = ds["fVertex"][:]
+    else
+        # initalize coriolis as zero b/c not included in the base mesh
+        fᵛ = zeros(eltype(xᵛ), nVertices)
+    end
 
     # intra connectivity
     edgesOnVertex = ds["edgesOnVertex"][:,:]
@@ -248,10 +254,16 @@ function readEdgeInfo(ds)
     yᵉ = ds["yEdge"][:]
     zᵉ = ds["zEdge"][:]
 
-    fᵉ = ds["fEdge"][:]
-        
+    if haskey(ds, "fEdge")
+        fᵉ = ds["fEdge"][:]
+    else
+        # initalize coriolis as zero b/c not included in the base mesh
+        fᵉ = zeros(eltype(xᵉ), nEdges)
+    end
+
     nEdgesOnEdge = ds["nEdgesOnEdge"][:]
 
+   
     # intra connectivity
     cellsOnEdge = ds["cellsOnEdge"][:,:]
     verticesOnEdge = ds["verticesOnEdge"][:,:]
@@ -263,6 +275,7 @@ function readEdgeInfo(ds)
     dvEdge = ds["dvEdge"][:]
     dcEdge = ds["dcEdge"][:]
 
+    angleEdge = ds["angleEdge"][:]
         
     Edges(nEdges = nEdges,
           xᵉ = xᵉ, yᵉ = yᵉ, zᵉ = zᵉ, fᵉ = fᵉ,
@@ -272,7 +285,8 @@ function readEdgeInfo(ds)
           edgesOnEdge = edgesOnEdge,
           weightsOnEdge = weightsOnEdge,
           dvEdge = dvEdge,
-          dcEdge = dcEdge)
+          dcEdge = dcEdge, 
+          angleEdge = angleEdge)
 end
 
 function signIndexField!(primaryCells::PrimaryCells, edges::Edges)
@@ -335,6 +349,53 @@ function ReadHorzMesh(meshPath::String; backend=KA.CPU())
     mesh = HorzMesh(PrimaryMesh, DualMesh, edges)
     
     # move the horizontal mesh struct to requested backend
+    # NOTE: this does not happen earlier (i.e. in constructors of PrimaryCells,
+    #       DualCells, Edges) b/c of the uninitialized fields in the mesh 
+    #       strucutres which are populated above. It's more efficent to have
+    #       those calculations happen on CPU (I think)
     Adapt.adapt_structure(backend, mesh)
 end
 
+function Adapt.adapt_structure(to, edges::Edges)
+    return Edges(nEdges = edges.nEdges,
+                 xᵉ = Adapt.adapt(to, edges.xᵉ),
+                 yᵉ = Adapt.adapt(to, edges.yᵉ),
+                 zᵉ = Adapt.adapt(to, edges.zᵉ),
+                 fᵉ = Adapt.adapt(to, edges.fᵉ),
+                 nEdgesOnEdge = Adapt.adapt(to, edges.nEdgesOnEdge),
+                 cellsOnEdge = Adapt.adapt(to, edges.cellsOnEdge),
+                 verticesOnEdge = Adapt.adapt(to, edges.verticesOnEdge),
+                 edgesOnEdge = Adapt.adapt(to, edges.edgesOnEdge),
+                 weightsOnEdge = Adapt.adapt(to, edges.weightsOnEdge),
+                 dvEdge = Adapt.adapt(to, edges.dvEdge),
+                 dcEdge = Adapt.adapt(to, edges.dcEdge), 
+                 angleEdge = Adapt.adapt(to, edges.angleEdge))
+end
+
+function Adapt.adapt_structure(to, cells::PrimaryCells)
+    return PrimaryCells(nCells = cells.nCells,
+                        maxEdges = cells.maxEdges,
+                        xᶜ = Adapt.adapt(to, cells.xᶜ),
+                        yᶜ = Adapt.adapt(to, cells.yᶜ),
+                        zᶜ = Adapt.adapt(to, cells.zᶜ),
+                        fᶜ = Adapt.adapt(to, cells.fᶜ),
+                        nEdgesOnCell = Adapt.adapt(to, cells.nEdgesOnCell),
+                        edgesOnCell = Adapt.adapt(to, cells.edgesOnCell),
+                        verticesOnCell = Adapt.adapt(to, cells.verticesOnCell),
+                        cellsOnCell = Adapt.adapt(to, cells.cellsOnCell),
+                        edgeSignOnCell = Adapt.adapt(to, cells.edgeSignOnCell),
+                        areaCell = Adapt.adapt(to, cells.areaCell))
+end
+
+function Adapt.adapt_structure(to, duals::DualCells)
+    return DualCells(nVertices = duals.nVertices,
+                     vertexDegree = duals.vertexDegree,
+                     xᵛ = Adapt.adapt(to, duals.xᵛ),
+                     yᵛ = Adapt.adapt(to, duals.yᵛ),
+                     zᵛ = Adapt.adapt(to, duals.zᵛ),
+                     fᵛ = Adapt.adapt(to, duals.fᵛ),
+                     edgesOnVertex = Adapt.adapt(to, duals.edgesOnVertex),
+                     cellsOnVertex = Adapt.adapt(to, duals.cellsOnVertex),
+                     edgeSignOnVertex = Adapt.adapt(to, duals.edgeSignOnVertex),
+                     areaTriangle = Adapt.adapt(to, duals.areaTriangle))
+end
