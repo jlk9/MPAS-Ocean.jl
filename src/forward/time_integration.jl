@@ -31,7 +31,8 @@ function ocn_timestep(Prog::PrognosticVars,
                       Diag::DiagnosticVars,
                       Tend::TendencyVars, 
                       S::ModelSetup,
-                      ::Type{RungeKutta4})
+                      ::Type{RungeKutta4}; 
+                      backend = KA.CPU())
 
     
     Mesh = S.mesh 
@@ -120,7 +121,8 @@ function ocn_timestep(Prog::PrognosticVars,
                       Diag::DiagnosticVars,
                       Tend::TendencyVars, 
                       S::ModelSetup, 
-                      ::Type{ForwardEuler})
+                      ::Type{ForwardEuler};
+                      backend = KA.CPU())
     
     Mesh = S.mesh 
     Clock = S.timeManager 
@@ -137,13 +139,13 @@ function ocn_timestep(Prog::PrognosticVars,
     @unpack ssh, normalVelocity, layerThickness = Prog
 
     # compute the diagnostics
-    diagnostic_compute!(Mesh, Diag, Prog)
+    diagnostic_compute!(Mesh, Diag, Prog; backend = backend)
 
     # compute normalVelocity tenedency 
-    computeTendency!(Mesh, Diag, Prog, Tend, :normalVelocity)
+    computeNormalVelocityTendency!(Mesh, Diag, Prog, Tend; backend = backend)
 
     # compute layerThickness tendency 
-    computeLayerThicknessTendency!(Mesh, Diag, Prog, Tend)
+    computeLayerThicknessTendency!(Mesh, Diag, Prog, Tend; backend = backend)
     
     # unpack the tendency variable arrays 
     @unpack tendNormalVelocity, tendLayerThickness = Tend 

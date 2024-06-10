@@ -48,7 +48,7 @@ mutable struct TendencyVars{F<:AbstractFloat, FV2 <: AbstractArray{F,2}}
     end
 end 
 
-function TendencyVars(Config::GlobalConfig, Mesh::Mesh, backend=KA.CPU())
+function TendencyVars(Config::GlobalConfig, Mesh::Mesh; backend=KA.CPU())
         
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack PrimaryCells, Edges = HorzMesh

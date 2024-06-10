@@ -9,14 +9,14 @@ using KernelAbstractions
                                        n_{\rm e,i} F_{\rm e} l_{\rm e}
 ```
 """
-@kernel function DivergenceOnCell(@Const(nEdgesOnCell), 
+@kernel function DivergenceOnCell(DivCell, 
+                                  @Const(VecEdge),
+                                  @Const(nEdgesOnCell), 
                                   @Const(edgesOnCell),
                                   @Const(maxLevelEdgeTop),
                                   @Const(edgeSignOnCell),
                                   @Const(dvEdge),
-                                  @Const(areaCell),
-                                  @Const(VecEdge),
-                                  DivCell)
+                                  @Const(areaCell))
 
     iCell = @index(Global, Linear)
     
@@ -39,6 +39,31 @@ using KernelAbstractions
     
     #DivCell[k,iCell] = div * invArea
 
+end
+
+function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=KA.CPU())
+
+    @unpack HorzMesh, VertMesh = Mesh    
+    @unpack PrimaryCells, DualCells, Edges = HorzMesh
+    
+    @unpack dvEdge = Edges
+    @unpack maxLevelEdge = VertMesh 
+    @unpack nCells, nEdgesOnCell = PrimaryCells
+    @unpack edgesOnCell, edgeSignOnCell, areaCell = PrimaryCells
+    
+    kernel! = DivergenceOnCell(backend)
+
+    kernel!(DivCell, 
+            VecEdge,
+            nEdgesOnCell, 
+            edgesOnCell,
+            maxLevelEdge.Top,
+            edgeSignOnCell,
+            dvEdge,
+            areaCell, 
+            ndrange = nCells)
+
+    KA.synchronize(backend)
 end
 
 @doc raw"""
@@ -71,6 +96,20 @@ end
     end
 end
 
+function GradientOnEdge!(grad, hᵢ, Mesh::Mesh; backend=KA.CPU())
+   
+    @unpack HorzMesh, VertMesh = Mesh    
+
+    @unpack Edges = HorzMesh
+    @unpack maxLevelEdge = VertMesh 
+    @unpack nEdges, dcEdge, cellsOnEdge = Edges
+    
+    kernel! = GradientOnEdge(backend)
+
+    kernel!(cellsOnEdge, dcEdge, maxLevelEdge.Top, hᵢ, grad, ndrange=nEdges)
+
+    KA.synchronize(backend)
+end
 
 #@doc raw"""
 #"""
@@ -80,3 +119,40 @@ end
 #                                       @Const(VecEdge),
 #                                       ReconEdge)
 #end 
+
+
+function interpolateCell2Edge!(edgeValue, cellValue, Mesh::Mesh; backend = KA.CPU())
+    
+    @unpack HorzMesh, VertMesh = Mesh    
+    @unpack Edges = HorzMesh
+
+    @unpack maxLevelEdge = VertMesh 
+    @unpack nEdges, cellsOnEdge = Edges
+
+    kernel! = interpolateCell2Edge(backend)
+
+    kernel!(edgeValue,
+            cellValue,
+            cellsOnEdge,
+            maxLevelEdge.Top,
+            ndrange=nEdges)
+
+    KA.synchronize(backend)
+end
+
+@kernel function interpolateCell2Edge(edgeValue, 
+                                      @Const(cellValue), 
+                                      @Const(cellsOnEdge), 
+                                      @Const(maxLevelEdgeTop))
+
+
+    iEdge = @index(Global, Linear)
+    
+    @inbounds iCell1 = cellsOnEdge[1,iEdge]
+    @inbounds iCell2 = cellsOnEdge[2,iEdge]
+
+    @inbounds for k in 1:maxLevelEdgeTop[iEdge]
+        edgeValue[k, iEdge] = 0.5 * (cellValue[k, iCell1] +
+                                     cellValue[k, iCell2])
+    end
+end

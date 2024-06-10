@@ -23,6 +23,11 @@ struct Mesh{HM,VM}
     # on the same backend
 end
 
+function Adapt.adapt_structure(backend, x::Mesh)
+    return Mesh(Adapt.adapt(backend, x.HorzMesh),
+                Adapt.adapt(backend, x.VertMesh))
+end
+
 include("HorzMesh.jl")
 include("VertMesh.jl")
 

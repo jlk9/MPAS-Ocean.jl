@@ -1,4 +1,5 @@
 using Dates
+using CUDA
 using MOKA
 using Statistics
 using KernelAbstractions 
@@ -10,8 +11,12 @@ const KA=KernelAbstractions
 config_fp = "/global/homes/a/anolan/MPAS-Ocean.jl/bare_minimum.yml"
 
 function ocn_run(config_fp)
+    
+    backend = KA.CPU()
+    #backend = CUDABackend()
+
     # Initialize the Model  
-    Setup, Diag, Tend, Prog = ocn_init(config_fp, backend=KA.CPU())
+    Setup, Diag, Tend, Prog = ocn_init(config_fp, backend = backend)
     
     mesh = Setup.mesh 
     config = Setup.config
@@ -36,7 +41,7 @@ function ocn_run(config_fp)
     
         global i += 1 
     
-        ocn_timestep(Prog, Diag, Tend, Setup, ForwardEuler)
+        ocn_timestep(Prog, Diag, Tend, Setup, ForwardEuler; backend=backend)
         #ocn_timestep(Prog, Diag, Tend, Setup, RungeKutta4)
         
         if isRinging(outputAlarm)
@@ -48,6 +53,10 @@ function ocn_run(config_fp)
     # Only suport i/o at the end of the simulation for now 
     write_netcdf(Setup, Diag, Prog)
     
+    backend = get_backend(Tend.tendNormalVelocity)
+    arch = typeof(backend) <: KA.GPU ? "GPU" : "CPU" 
+
+    println("Moka.jl ran on $arch")
     println(clock.currTime)
 end
 

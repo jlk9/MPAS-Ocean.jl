@@ -1,3 +1,5 @@
+import Adapt
+
 mutable struct VerticalCoordinate{CC2DA, VA}
     restingThickness::CC2DA
     movementWeights::VA
@@ -18,14 +20,17 @@ end
 mutable struct ActiveLevels{IV}
     Top::IV
     Bot::IV
-
-    function ActiveLevels(dim, eltype, backend)
-        Top = KA.ones(backend, eltype, dim)
-        Bot = KA.ones(backend, eltype, dim)
-
-        new{typeof(Top)}(Top, Bot)
-    end
 end
+
+function ActiveLevels(dim, eltype, backend)
+    Top = KA.ones(backend, eltype, dim)
+    Bot = KA.ones(backend, eltype, dim)
+
+    ActiveLevels(Top, Bot)
+end
+
+# additional constructor needed for adapt methods
+#ActiveLevels(Top::IV, Bot::IV) where {IV} = ActiveLevels{IV}(Top, Bot)
 
 function ActiveLevels{Edge}(mesh; backend=KA.CPU())
     ActiveLevels(mesh.Edges.nEdges, Int32, backend)
@@ -54,3 +59,18 @@ function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
                  ActiveLevelsVertex, 
                  Adapt.adapt(backend, restingThickness))
 end
+
+function Adapt.adapt_structure(backend, x::ActiveLevels)
+    return ActiveLevels(Adapt.adapt(backend, x.Top), 
+                        Adapt.adapt(backend, x.Bot))
+end
+
+function Adapt.adapt_structure(backend, x::VerticalMesh)
+    return VerticalMesh(x.nVertLevels,
+                        Adapt.adapt(backend, x.minLevelCell), 
+                        Adapt.adapt(backend, x.maxLevelCell),
+                        Adapt.adapt(backend, x.maxLevelEdge),
+                        Adapt.adapt(backend, x.maxLevelVertex),
+                        Adapt.adapt(backend, x.restingThickness))
+end
+

@@ -18,14 +18,14 @@ function ocn_init(Config_filepath; backend=KA.CPU())
 
     # Prognostics should be intialized here, 
     # add option to read from input file (i.e. mesh) or from restrart
-    Prog = PrognosticVars_init(Config, Mesh)
+    Prog = PrognosticVars(Config, Mesh; backend=backend)
     
     # Diagnostic and Tendecies probabl don't need to be initialized here 
     # instead should happen within the `ocn_run` method, prior to entering 
     # the first time integration loop to ensure values are initialized 
-    Diag = DiagnosticVars_init(Config, Mesh) 
+    Diag = DiagnosticVars(Config, Mesh; backend=backend)
 
-    Tend = TendencyVars(Config, Mesh)
+    Tend = TendencyVars(Config, Mesh; backend=backend)
 
     return Setup, Diag, Tend, Prog
 end 
@@ -39,8 +39,8 @@ function ocn_setup_mesh(Config::GlobalConfig; backend=KA.CPU())
     # read the inut mesh from the configuartion file 
     # NOTE: This might be a restart file based on config options 
 
-    h_mesh = ReadHorzMesh(mesh_fp)
-    v_mesh = VerticalMesh(mesh_fp, h_mesh)
+    h_mesh = ReadHorzMesh(mesh_fp; backend=backend)
+    v_mesh = VerticalMesh(mesh_fp, h_mesh; backend=backend)
 
     Mesh(h_mesh, v_mesh)
 end 

@@ -1,8 +1,10 @@
-mutable struct DiagnosticVars{F}
+import Adapt
+
+mutable struct DiagnosticVars{F <: AbstractFloat, FV2 <: AbstractArray{F,2}}
     
     # var: layer thickness averaged from cell centers to edges [m]
     # dim: (nVertLevels, nEdges) Time?)
-    layerThicknessEdge::Array{F,2}
+    layerThicknessEdge::FV2
     
     #= Performance Note: 
     # ###########################################################
@@ -34,11 +36,25 @@ mutable struct DiagnosticVars{F}
     # dim: (nVertLevels, nCells)
     divergence::Array{F,2}
     =# 
+
+    function DiagnosticVars(layerThicknessEdge::AT2D) where {AT2D}
+        ## pack all the arguments into a tuple for type and backend checking
+        #args = (layerThicknessEdge, ...)
+        #
+        ## check the type names; irrespective of type parameters
+        ## (e.g. `Array` instead of `Array{Float64, 1}`)
+        #check_typeof_args(args)
+        ## check that all args are on the same backend
+        #check_args_backend(args)
+        ## check that all args have the same `eltype` and get that type
+        #type = check_eltype_args(args)
+        type = eltype(layerThicknessEdge) 
+
+        new{type, AT2D}(layerThicknessEdge)
+    end
 end 
  
-function DiagnosticVars_init(config::GlobalConfig,
-                             Mesh::Mesh,
-                             backend=KA.CPU())
+function DiagnosticVars(config::GlobalConfig, Mesh::Mesh; backend=KA.CPU())
 
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack PrimaryCells, Edges = HorzMesh
@@ -47,26 +63,26 @@ function DiagnosticVars_init(config::GlobalConfig,
     nCells = PrimaryCells.nCells
     nVertLevels = VertMesh.nVertLevels
     
-    inputConfig = ConfigGet(config.streams, "input")
-    input_filename = ConfigGet(inputConfig, "filename_template")
-
-    input = NCDataset(input_filename)
-
     # Here in the init function is where some sifting through will 
     # need to be done, such that only diagnostic variables required by 
     # the `Config` or requested by the `streams` will be activated. 
     
-    layerThicknessEdge = zeros(Float64, nVertLevels, nEdges) 
-    #restingThickness = zeros(Float64, nVertLevels, nCells)
+    # create zero vectors to store diagnostic variables, on desired backend
+    layerThicknessEdge = KA.zeros(backend, Float64, nVertLevels, nEdges) 
 
-
-DiagnosticVars{Float64}(Adapt.adapt(backend, layerThicknessEdge))
-                            #Adapt.adapt(backend, restingThickness))
+    DiagnosticVars(layerThicknessEdge)
 end 
 
-function diagnostic_compute!(Mesh::Mesh, Diag::DiagnosticVars, Prog::PrognosticVars)
+function Adapt.adapt_structure(to, x::DiagnosticVars)
+    return DiagnosticVars(Adapt.adapt(to, x.layerThicknessEdge))
+end
 
-    calculate_layerThicknessEdge!(Mesh, Diag, Prog)
+function diagnostic_compute!(Mesh::Mesh,
+                             Diag::DiagnosticVars,
+                             Prog::PrognosticVars;
+                             backend = KA.CPU())
+
+    calculate_layerThicknessEdge!(Mesh, Diag, Prog; backend = backend)
 
 end 
 
@@ -98,12 +114,18 @@ end
 
 function calculate_layerThicknessEdge!(Mesh::Mesh,
                                        Diag::DiagnosticVars,
-                                       Prog::PrognosticVars)
+                                       Prog::PrognosticVars; 
+                                       backend = KA.CPU())
     
-    layerThickness = @view Prog.layerThickness[:,:,end]
+    layerThickness = Prog.layerThickness[:,:,end]
+    #layerThickness = @view Prog.layerThickness[:,:,end]
         
     @unpack layerThicknessEdge = Diag 
-
+    
+    interpolateCell2Edge!(layerThicknessEdge, 
+                          layerThickness,
+                          Mesh; backend = backend)
+    #=
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack Edges = HorzMesh
 
@@ -124,7 +146,7 @@ function calculate_layerThicknessEdge!(Mesh::Mesh,
                                                  layerThickness[k,cell2Index])
         end 
     end 
-
+    =#
     @pack! Diag = layerThicknessEdge
 end 
 

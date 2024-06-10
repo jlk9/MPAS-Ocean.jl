@@ -1,4 +1,6 @@
 using UnPack
+
+import Adapt
 #using MPAS_O: GlobalConfig, Mesh, ConfigGet, NCDataset
 
 mutable struct PrognosticVars{F<:AbstractFloat, FV2 <: AbstractArray{F,2}, FV3 <: AbstractArray{F, 3}}
@@ -42,9 +44,7 @@ mutable struct PrognosticVars{F<:AbstractFloat, FV2 <: AbstractArray{F,2}, FV3 <
     end        
 end 
 
-function PrognosticVars_init(config::GlobalConfig,
-                             mesh::Mesh,
-                             backend=KA.CPU())
+function PrognosticVars(config::GlobalConfig, mesh::Mesh; backend=KA.CPU())
     
     timeManagementConfig = ConfigGet(config.namelist, "time_management")
     do_restart = ConfigGet(timeManagementConfig, "config_do_restart")
@@ -88,3 +88,8 @@ function PrognosticVars_init(config::GlobalConfig,
                    Adapt.adapt(backend, layerThickness))
 end 
 
+function Adapt.adapt_structure(to, x::PrognosticVars)
+    return PrognosticVars(Adapt.adapt(to, x.ssh),
+                          Adapt.adapt(to, x.normalVelocity), 
+                          Adapt.adapt(to, x.layerThickness))
+end

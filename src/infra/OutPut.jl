@@ -1,7 +1,12 @@
 function write_netcdf(Setup::ModelSetup,
                       Diag::DiagnosticVars,
                       Prog::PrognosticVars)
-    Mesh = Setup.mesh
+
+    # copy the data structures back to the CPU
+    Mesh = Adapt.adapt_structure(KA.CPU(), Setup.mesh)
+    Diag = Adapt.adapt_structure(KA.CPU(), Diag)
+    Prog = Adapt.adapt_structure(KA.CPU(), Prog)
+
     clock = Setup.timeManager
     config = Setup.config
 

@@ -1,11 +1,14 @@
+using CUDA: @allowscalar
+
 function computeLayerThicknessTendency!(Mesh::Mesh,
                                         Diag::DiagnosticVars,
                                         Prog::PrognosticVars,
-                                        Tend::TendencyVars)
-                                        #:LayerThickness)
+                                        Tend::TendencyVars;
+                                        backend = KA.CPU())
 
      
-    normalVelocity = @view Prog.normalVelocity[:,:,end]
+    normalVelocity = Prog.normalVelocity[:,:,end]
+    #normalVelocity = @view Prog.normalVelocity[:,:,end]
 
     @unpack layerThicknessEdge = Diag
     @unpack tendLayerThickness = Tend 
@@ -15,10 +18,11 @@ function computeLayerThicknessTendency!(Mesh::Mesh,
 
     # NOTE: Forcing would be applied here
     
-    horizontal_advection_tendency!(Mesh,
+    @allowscalar horizontal_advection_tendency!(tendLayerThickness, 
+                                   Mesh,
                                    normalVelocity,
-                                   layerThicknessEdge,
-                                   tendLayerThickness)
+                                   layerThicknessEdge;
+                                   backend = backend)
     #=
     vertical_advection_tendency!(Mesh::Mesh,
                                  vertAleTransportTop,
@@ -28,10 +32,35 @@ function computeLayerThicknessTendency!(Mesh::Mesh,
     @pack! Tend = tendLayerThickness
 end 
 
-function horizontal_advection_tendency!(Mesh::Mesh,
+function horizontal_advection_tendency!(tendLayerThickness, 
+                                        Mesh::Mesh, 
+                                        normalVelocity, 
+                                        layerThicknessEdge;
+                                        backend = backend)
+
+    
+    @unpack HorzMesh, VertMesh = Mesh    
+    @unpack PrimaryCells, DualCells, Edges = HorzMesh
+
+    @unpack nCells = PrimaryCells
+    @unpack nVertLevels = VertMesh
+
+    scratch = KA.zeros(backend, eltype(normalVelocity), nVertLevels, nCells)
+    
+    # scale the input vector defined at edges
+    normalVelocity .*= layerThicknessEdge
+
+    DivergenceOnCell!(scratch, normalVelocity, Mesh; backend=backend)
+
+    tendLayerThickness .-= scratch
+end
+
+
+#= 
+function horizontal_advection_tendency!(tendLayerThickness, 
+                                        Mesh::Mesh,
                                         normalVelocity,
-                                        layerThicknessEdge,
-                                        tendLayerThickness)
+                                        layerThicknessEdge)
     
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack PrimaryCells, DualCells, Edges = HorzMesh
@@ -58,6 +87,7 @@ function horizontal_advection_tendency!(Mesh::Mesh,
         end 
     end 
 end
+=# 
 
 #= NOT YET USED: Currently only supporting stacked shallow water
 function vertical_advection_tendency!(Mesh::Mesh,
