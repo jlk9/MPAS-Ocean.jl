@@ -215,14 +215,14 @@ function divergence!(div, 𝐅ₑ, mesh::HorzMesh; backend=KA.CPU())
     
     kernel! = DivergenceOnCell(backend)
     
-    kernel!(nEdgesOnCell,
+    kernel!(div,
+            𝐅ₑ,
+            nEdgesOnCell,
             edgesOnCell,
             maxLevelEdgeTop,
             edgeSignOnCell,
             dvEdge,
             areaCell,
-            𝐅ₑ,
-            div,
             ndrange=nCells)
 
     KA.synchronize(backend)
