@@ -240,8 +240,8 @@ mesh_fn  = "MokaMesh.nc"
 
 Downloads.download(mesh_url, mesh_fn)
 
-#backend = KA.CPU()
-backend = CUDABackend();
+backend = KA.CPU()
+#backend = CUDABackend();
 
 mesh = ReadHorzMesh(mesh_fn; backend=backend)
 setup = TestSetup(mesh, PlanarTest; backend=backend)
