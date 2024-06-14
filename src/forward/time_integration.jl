@@ -126,7 +126,8 @@ function ocn_timestep(Prog::PrognosticVars,
     
     Mesh = S.mesh 
     Clock = S.timeManager 
-    
+    Config = S.config 
+
     time = convert(Float64, Dates.value(Second(Clock.currTime - Clock.startTime)))
 
     # advance the timelevels within the state strcut 
@@ -142,11 +143,12 @@ function ocn_timestep(Prog::PrognosticVars,
     diagnostic_compute!(Mesh, Diag, Prog; backend = backend)
 
     # compute normalVelocity tenedency 
-    computeNormalVelocityTendency!(Mesh, Diag, Prog, Tend; backend = backend)
-
+    computeNormalVelocityTendency!(Tend, Prog, Diag, Mesh, Config;
+                                   backend = backend)
     # compute layerThickness tendency 
-    computeLayerThicknessTendency!(Mesh, Diag, Prog, Tend; backend = backend)
-    
+    computeLayerThicknessTendency!(Tend, Prog, Diag, Mesh, Config;
+                                   backend = backend)
+
     # unpack the tendency variable arrays 
     @unpack tendNormalVelocity, tendLayerThickness = Tend 
 

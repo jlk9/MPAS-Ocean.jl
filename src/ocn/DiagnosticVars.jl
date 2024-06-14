@@ -6,6 +6,10 @@ mutable struct DiagnosticVars{F <: AbstractFloat, FV2 <: AbstractArray{F,2}}
     # dim: (nVertLevels, nEdges) Time?)
     layerThicknessEdge::FV2
     
+    # var: ....
+    # vim: (nVertLevels, nEdges)
+    thicknessFlux::FV2
+
     #= Performance Note: 
     # ###########################################################
     #  While these can be stored as diagnostic variales I don't 
@@ -37,20 +41,21 @@ mutable struct DiagnosticVars{F <: AbstractFloat, FV2 <: AbstractArray{F,2}}
     divergence::Array{F,2}
     =# 
 
-    function DiagnosticVars(layerThicknessEdge::AT2D) where {AT2D}
-        ## pack all the arguments into a tuple for type and backend checking
-        #args = (layerThicknessEdge, ...)
-        #
-        ## check the type names; irrespective of type parameters
-        ## (e.g. `Array` instead of `Array{Float64, 1}`)
-        #check_typeof_args(args)
-        ## check that all args are on the same backend
-        #check_args_backend(args)
-        ## check that all args have the same `eltype` and get that type
-        #type = check_eltype_args(args)
-        type = eltype(layerThicknessEdge) 
+    function DiagnosticVars(layerThicknessEdge::AT2D, 
+                            thicknessFlux::AT2D) where {AT2D}
+        # pack all the arguments into a tuple for type and backend checking
+        args = (layerThicknessEdge, thicknessFlux)
+        
+        # check the type names; irrespective of type parameters
+        # (e.g. `Array` instead of `Array{Float64, 1}`)
+        check_typeof_args(args)
+        # check that all args are on the same backend
+        check_args_backend(args)
+        # check that all args have the same `eltype` and get that type
+        type = check_eltype_args(args)
+        #type = eltype(layerThicknessEdge) 
 
-        new{type, AT2D}(layerThicknessEdge)
+        new{type, AT2D}(layerThicknessEdge, thicknessFlux)
     end
 end 
  
@@ -69,12 +74,14 @@ function DiagnosticVars(config::GlobalConfig, Mesh::Mesh; backend=KA.CPU())
     
     # create zero vectors to store diagnostic variables, on desired backend
     layerThicknessEdge = KA.zeros(backend, Float64, nVertLevels, nEdges) 
+    thicknessFlux = KA.zeros(backend, Float64, nVertLevels, nEdges) 
 
-    DiagnosticVars(layerThicknessEdge)
+    DiagnosticVars(layerThicknessEdge, thicknessFlux)
 end 
 
 function Adapt.adapt_structure(to, x::DiagnosticVars)
-    return DiagnosticVars(Adapt.adapt(to, x.layerThicknessEdge))
+    return DiagnosticVars(Adapt.adapt(to, x.layerThicknessEdge),
+                          Adapt.adapt(to, x.thicknessFlux))
 end
 
 function diagnostic_compute!(Mesh::Mesh,
@@ -83,7 +90,8 @@ function diagnostic_compute!(Mesh::Mesh,
                              backend = KA.CPU())
 
     calculate_layerThicknessEdge!(Mesh, Diag, Prog; backend = backend)
-
+    
+    calculate_thicknessFlux!(Diag, Prog, Mesh; backend = backend)
 end 
 
 #= Preformance Note:
@@ -99,126 +107,32 @@ end
     configuration options for how to calculate that term. 
 =# 
 
-#function diagnostic_compute!(Mesh::Mesh,
-#                             Diag::DiagnosticVars,
-#                             Prog::PrognosticVars,
-#                             :layerThicknessEdge)
-#
-#   @unpack layerThickness = Prog 
-#   @unpack layerThicknessEdge 
-#    
-#   calculate_layerThicknessEdge!(Mesh, layerThicknessEdge, layerThickness)
-#
-#   @pack! Diag = layerThicknessEdge
-#end 
-
 function calculate_layerThicknessEdge!(Mesh::Mesh,
                                        Diag::DiagnosticVars,
                                        Prog::PrognosticVars; 
                                        backend = KA.CPU())
     
     layerThickness = Prog.layerThickness[:,:,end]
-    #layerThickness = @view Prog.layerThickness[:,:,end]
-        
     @unpack layerThicknessEdge = Diag 
     
     interpolateCell2Edge!(layerThicknessEdge, 
                           layerThickness,
                           Mesh; backend = backend)
-    #=
-    @unpack HorzMesh, VertMesh = Mesh    
-    @unpack Edges = HorzMesh
 
-    @unpack maxLevelEdge = VertMesh 
-    @unpack nEdges, cellsOnEdge = Edges
-
-
-    #@unpack nEdges, cellsOnEdge, maxLevelEdgeTop = Mesh
-
-    @fastmath for iEdge in 1:nEdges
-        
-        # different indexing b/c SoA requires array of tuples
-        cell1Index = cellsOnEdge[1, iEdge]
-        cell2Index = cellsOnEdge[2, iEdge]
-
-        @fastmath for k in 1:maxLevelEdge.Top[iEdge]
-            layerThicknessEdge[k,iEdge] = 0.5 * (layerThickness[k,cell1Index] +
-                                                 layerThickness[k,cell2Index])
-        end 
-    end 
-    =#
     @pack! Diag = layerThicknessEdge
 end 
 
-#= 
-#function diagnositc_compute!(Mesh::Mesh, Diag::DiagnosticVars, Prog::PrognosticVars, :gradSSH) 
-#    @unpack ssh = Prog
-#    @unpack gradSSH
-#    
-#    calculate_gradSSH!(Mesh, gradSSH, ssh)
-#
-#    @pack! Diag = gradSSH
-#end 
-
-# AGAIN, not really sure if this need to be a Diagnostic, since this Requires 
-# array allocations, wheres this could be done locally in the momentum tendency term
-function calculate_gradSSH!(Mesh::Mesh,
-                            Diag::DiagnosticVars,
-                            Prog::PrognosticVars)
+function calculate_thicknessFlux!(Diag::DiagnosticVars, 
+                                  Prog::PrognosticVars, 
+                                  Mesh::Mesh;
+                                  backend = KA.CPU()) 
     
-    @unpack ssh = Prog
-    @unpack gradSSH = Diag
-    @unpack nEdges, boundaryEdge, cellsOnEdge, maxLevelEdgeTop, dcEdge = Mesh
+
+    normalVelocity = Prog.normalVelocity[:,:,end]
+    @unpack thicknessFlux, layerThicknessEdge = Diag 
     
-    @fastmath for iEdge in 1:nEdges
-        
-        if boundaryEdge[iEdge] == 0 nothing else continue end  
+    # Warning: not performant, this needs to be fixed
+    thicknessFlux .= normalVelocity .* layerThicknessEdge
 
-        cell1Index = cellsOnEdge[1,iEdge]
-        cell2Index = cellsOnEdge[2,iEdge]
-        
-        @fastmath for k in 1:maxLevelEdgeTop[iEdge]
-            gradSSH[k,iEdge] = (ssh[k,cell1Index] - ssh[k,cell2Index]) / dcEdge[iEdge] 
-        end 
-    end 
-
-    @pack! Diag = gradSSH
-end 
- 
-#function diagnostic_compute!(Mesh::Mesh, Diag::DiagnosicVars, Prog::PrognosticVars, :div_hu)
-#   @unpack normalVelocity = Prog 
-#   @unpack layerThicknessEdge, div_hu = Diag
-#
-#   calculate_div_hu!(Mesh, layerThicknessEdge, normalVelocity, div_hu)
-#
-#   @pack! Diag = div_hu 
-#end 
-
-function calculate_div_hu!(Mesh::Mesh,
-                           Diag::DiagnosticVars,
-                           Prog::PrognosticVars)
-
-   @unpack normalVelocity = Prog 
-   @unpack layerThicknessEdge, div_hu = Diag
-   @unpack nCells, nEdgesOnCell = Mesh
-   @unpack edgesOnCell, edgeSignOnCell = Mesh  
-   @unpack dvEdge, areaCell, maxLevelCell = Mesh 
-
-   # need to reset the field to zero, since the divergence at cell center is the summation of 
-   # edge values 
-   # WARNING: this is not performant and should be fixed
-   div_hu .= 0.0
-   
-   @fastmath for iCell in nCells, i in 1:nEdgesOnCell[iCell]
-       iEdge = edgesOnCell[i,iCell]
-       @fastmath for k in 1:maxLevelCell[iCell]
-           flux = (edgeSignOnCell[i,iCell] * layerThicknessEdge[k,iEdge] 
-                * normalVelocity[k,iEdge] * dvEdge[iEdge] / areaCell[iCell])
-           div_hu[k,iCell] -= flux 
-       end 
-   end 
-
-   @pack! Diag = div_hu 
-
+    @pack! Diag = thicknessFlux
 end
-=#

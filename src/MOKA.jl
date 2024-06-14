@@ -31,8 +31,8 @@ module MOKA
     include("infra/OutPut.jl")
 
     include("ocn/Tendencies/TendencyVars.jl")
-    include("ocn/Tendencies/normalVelocity.jl")
-    include("ocn/Tendencies/layerThickness.jl")
+    include("ocn/Tendencies/normalVelocity/normalVelocity.jl")
+    include("ocn/Tendencies/layerThickness/layerThickness.jl")
 
     include("forward/init.jl")
     include("forward/time_integration.jl")
@@ -43,4 +43,6 @@ module MOKA
     ### Needed so we can export names from sub-modules at the top level
     ###
     using .MPASMesh    
+    using .normalVelocity
+    using .layerThickness
 end

@@ -64,20 +64,6 @@ function TendencyVars(Config::GlobalConfig, Mesh::Mesh; backend=KA.CPU())
     TendencyVars(tendNormalVelocity, tendLayerThickness) 
 end 
 
-
-function computeTendency!(Mesh::Mesh,
-                          Diag::DiagnosticVars,
-                          Prog::PrognosticVars,
-                          Tend::TendencyVars, 
-                          Var::Symbol)
-
-    if Var == :layerThickness
-        computeLayerThicknessTendency!(Mesh, Diag, Prog, Tend)
-    else Var == :normalVelocity 
-        computeNormalVelocityTendency!(Mesh, Diag, Prog, Tend)
-    end        
-end
-
 function axb!(a::Array{T,2}, x::T, b::Array{T,2}) where {T<:AbstractFloat}
     m,n = size(a)
 
