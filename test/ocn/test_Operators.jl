@@ -301,3 +301,10 @@ println("L∞ norm of error: $(divError.L_inf)")
 println("L₂ norm of error: $(divError.L_two)")
 println("\n" * "="^45 * "\n")
 
+###
+### Profiling GPU code:
+###
+using CUDA
+
+CUDA.@time @allowscalar gradient!(gradNum, Scalar, mesh; backend=backend)
+CUDA.@time @allowscalar divergence!(divNum, VecEdge, mesh; backend=backend)
