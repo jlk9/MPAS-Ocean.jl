@@ -5,6 +5,13 @@ using LinearAlgebra
 using CUDA: @allowscalar
 using MOKA: HorzMesh, ReadHorzMesh, GradientOnEdge, DivergenceOnCell, Edge, Cell, Vertex
 
+using Enzyme
+
+# Setting meshes to inactive types:
+#Enzyme.API.runtimeActivity!(true)
+#Enzyme.API.looseTypeAnalysis!(true)
+Enzyme.EnzymeRules.inactive_type(::Type{<:HorzMesh}) = true
+
 import Adapt
 import Downloads
 import KernelAbstractions as KA
@@ -301,3 +308,33 @@ println("L∞ norm of error: $(divError.L_inf)")
 println("L₂ norm of error: $(divError.L_two)")
 println("\n" * "="^45 * "\n")
 
+
+###
+### Here, we will test Enzyme AD on our kernels
+###
+
+# For gradient, we need to create shadows for all the primals:
+gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
+Scalar  = h(setup, PlanarTest)
+
+d_gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
+d_Scalar  = KA.zeros(backend, eltype(setup.xᶜ), (1, size(setup.xᶜ)[1]))
+d_mesh    = Enzyme.make_zero(mesh)
+
+d_gradNum[1] = 1.0
+
+@show gradNum
+@show Scalar
+
+d_gradient = autodiff(Enzyme.Reverse,
+                      gradient!,
+                      Duplicated(gradNum, d_gradNum),
+                      Duplicated(Scalar, d_Scalar),
+                      Duplicated(mesh, d_mesh))
+
+@show gradNum
+@show Scalar
+
+@show d_gradNum
+@show d_Scalar
+#@show d_mesh
