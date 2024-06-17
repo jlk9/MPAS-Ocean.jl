@@ -306,5 +306,51 @@ println("\n" * "="^45 * "\n")
 ###
 using CUDA
 
-CUDA.@time @allowscalar gradient!(gradNum, Scalar, mesh; backend=backend)
-CUDA.@time @allowscalar divergence!(divNum, VecEdge, mesh; backend=backend)
+function gradient_prework(mesh::HorzMesh; backend=KA.CPU())
+    
+    @unpack Edges = mesh
+
+    @unpack nEdges, dcEdge, cellsOnEdge = Edges
+    
+    # only testing horizontal mesh, so set up dummy array for verticalLevels
+    maxLevelEdgeTop = KA.ones(backend, eltype(cellsOnEdge), nEdges)
+
+    return cellsOnEdge, dcEdge, maxLevelEdgeTop, nEdges
+end
+
+function divergence_prework(mesh::HorzMesh; backend=KA.CPU())
+
+    @unpack PrimaryCells, DualCells, Edges = mesh
+
+    @unpack nEdges, dvEdge = Edges
+    @unpack nCells, nEdgesOnCell = PrimaryCells
+    @unpack edgesOnCell, edgeSignOnCell, areaCell = PrimaryCells
+
+    # only testing horizontal mesh, so set up dummy array for verticalLevels
+    maxLevelEdgeTop = KA.ones(backend, eltype(edgesOnCell), nEdges)
+    
+    return nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, nCells
+end
+
+# Timing gradient kernel:
+cellsOnEdge, dcEdge, maxLevelEdgeTop, nEdges = gradient_prework(mesh; backend=backend)
+
+gradient_kernel! = GradientOnEdge(backend)
+
+CUDA.@time gradient_kernel!(cellsOnEdge, dcEdge, maxLevelEdgeTop, Scalar, gradNum, ndrange=nEdges)
+CUDA.@time gradient_kernel!(cellsOnEdge, dcEdge, maxLevelEdgeTop, Scalar, gradNum, ndrange=nEdges)
+CUDA.@time gradient_kernel!(cellsOnEdge, dcEdge, maxLevelEdgeTop, Scalar, gradNum, ndrange=nEdges)
+
+# Timing divergence kernel:
+nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, nCells = divergence_prework(mesh; backend=backend)
+
+divergence_kernel! = DivergenceOnCell(backend)
+
+CUDA.@time divergence_kernel!(divNum, VecEdge, nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, ndrange=nCells)
+CUDA.@time divergence_kernel!(divNum, VecEdge, nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, ndrange=nCells)
+CUDA.@time divergence_kernel!(divNum, VecEdge, nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, ndrange=nCells)
+
+
+# Need to run from REPL for these:
+#CUDA.@profile gradient!(gradNum, Scalar, mesh; backend=backend)
+#CUDA.@profile divergence!(divNum, VecEdge, mesh; backend=backend)
