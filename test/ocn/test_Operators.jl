@@ -3,7 +3,9 @@ using CUDA
 using UnPack
 using LinearAlgebra
 using CUDA: @allowscalar
-using MOKA: HorzMesh, ReadHorzMesh, GradientOnEdge, GradientOnEdgeTranspose, DivergenceOnCell, DivergenceOnCellTranspose1, DivergenceOnCellTranspose2, Edge, Cell, Vertex
+using MOKA: HorzMesh, ReadHorzMesh, GradientOnEdge, GradientOnEdgeModified, GradientOnEdgeTranspose,
+            DivergenceOnCell, DivergenceOnCellModified1, DivergenceOnCellModified2,
+            DivergenceOnCellTranspose1, DivergenceOnCellTranspose2, Edge, Cell, Vertex
 
 import Adapt
 import Downloads
@@ -350,12 +352,24 @@ for w = 1:kernelRuns
 end
 
 Scalar   = h(setup, PlanarTest)
+gradNumM = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
+
+vert_levels = 1 # CHANGE THIS WHEN WE HAVE MORE VERT LEVELS
+
+gradient_kernelM! = GradientOnEdgeModified(backend)
+
+@show "Timing modified gradient kernel"
+for w = 1:kernelRuns
+    CUDA.@time gradient_kernelM!(cellsOnEdge, dcEdge, Scalar, gradNumM, workgroupsize=64, ndrange=(nEdges, vert_levels))
+end
+@show maximum(abs.(gradNum - gradNumM) ./ (abs.(gradNum) .+ 1))
+
+Scalar   = h(setup, PlanarTest)
 gradNumT = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
 
 cellsOnEdge = cellsOnEdge'
 Scalar      = Scalar'
 gradNumT    = gradNumT'
-vert_levels = 1 # CHANGE THIS WHEN WE HAVE MORE VERT LEVELS
 
 gradient_kernelT! = GradientOnEdgeTranspose(backend)
 
@@ -386,7 +400,31 @@ end
 divNum = KA.zeros(backend, Float64, (1, mesh.PrimaryCells.nCells))
 divergence_kernel!(divNum, VecEdge, nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, ndrange=nCells)
 
-@show "Timing divergence kernel broken into 2 parts (using coalesced memory and column-major format)"
+@show "Timing divergence kernel broken into 2 parts"
+nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, nCells = divergence_prework(mesh; backend=backend)
+
+divNumM = KA.zeros(backend, Float64, (1, mesh.PrimaryCells.nCells))
+
+divergence_kernelM1! = DivergenceOnCellModified1(backend)
+divergence_kernelM2! = DivergenceOnCellModified2(backend)
+
+@show size(edgesOnCell)[2]
+
+n = size(edgesOnCell)[2]
+
+for w = 1:kernelRuns
+    CUDA.@time divergence_kernelM1!(VecEdge, dvEdge, workgroupsize=64, ndrange=(nEdges, vert_levels))
+    CUDA.@time divergence_kernelM2!(divNumM, VecEdge, nEdgesOnCell, edgesOnCell, edgeSignOnCell, areaCell, workgroupsize=32, ndrange=(nCells, vert_levels))
+end
+
+VecEdge = 𝐅ₑ(setup, PlanarTest)
+divergence_kernelM1!(VecEdge, dvEdge, workgroupsize=64, ndrange=(nEdges, vert_levels))
+divergence_kernelM2!(divNumM, VecEdge, nEdgesOnCell, edgesOnCell, edgeSignOnCell, areaCell, workgroupsize=32, ndrange=(nCells, vert_levels)) # Add Val{n}() as first arg for private memory
+
+# Error check between divergence computations:
+@show maximum(abs.(divNum - divNumM) ./ (abs.(divNum) .+ 1))
+
+@show "Timing transposed divergence kernel broken into 2 parts (using coalesced memory and column-major format)"
 nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, nCells = divergence_prework(mesh; backend=backend)
 
 divNumT = KA.zeros(backend, Float64, (1, mesh.PrimaryCells.nCells))
