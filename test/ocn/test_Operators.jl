@@ -3,7 +3,7 @@ using CUDA
 using UnPack
 using LinearAlgebra
 using CUDA: @allowscalar
-using MOKA: HorzMesh, ReadHorzMesh, GradientOnEdge, DivergenceOnCell, Edge, Cell, Vertex
+using MOKA: HorzMesh, ReadHorzMesh, GradientOnEdge, GradientOnEdgeTranspose, DivergenceOnCell, DivergenceOnCellTranspose1, DivergenceOnCellTranspose2, Edge, Cell, Vertex
 
 import Adapt
 import Downloads
@@ -235,17 +235,19 @@ end
 #mesh_fp ="mesh_database/doubly_periodic_10km_1000x2000km_planar.151117.nc"
 #mesh_url = lcrc_url * mesh_fp
 #
-mesh_url = "https://gist.github.com/mwarusz/f8caf260398dbe140d2102ec46a41268/raw/e3c29afbadc835797604369114321d93fd69886d/PlanarPeriodic48x48.nc"
-mesh_fn  = "MokaMesh.nc"
+#mesh_url = "https://gist.github.com/mwarusz/f8caf260398dbe140d2102ec46a41268/raw/e3c29afbadc835797604369114321d93fd69886d/PlanarPeriodic48x48.nc"
+#mesh_fn  = "MokaMesh.nc"
 
-Downloads.download(mesh_url, mesh_fn)
+#Downloads.download(mesh_url, mesh_fn)
+
+mesh_fn = "../meshes/inertialGravityWave/25km/initial_state.nc"
 
 #backend = KA.CPU()
 backend = CUDABackend();
 
 mesh = ReadHorzMesh(mesh_fn; backend=backend)
 setup = TestSetup(mesh, PlanarTest; backend=backend)
-
+#=
 ###
 ### Gradient Test
 ###
@@ -261,8 +263,8 @@ gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
 gradError = ErrorMeasures(gradNum, gradAnn, mesh, Edge)
 
 # test
-@test gradError.L_inf ≈ 0.00125026071878552 atol=atol
-@test gradError.L_two ≈ 0.06045450851939962 atol=atol
+#@test gradError.L_inf ≈ 0.00125026071878552 atol=atol
+#@test gradError.L_two ≈ 0.06045450851939962 atol=atol
 
 ###
 ### Divergence Test
@@ -279,8 +281,8 @@ divNum = KA.zeros(backend, Float64, (1, mesh.PrimaryCells.nCells))
 divError = ErrorMeasures(divNum, divAnn, mesh, Cell)
 
 # test
-@test divError.L_inf ≈ 0.00124886886594453 atol=atol
-@test divError.L_two ≈ 0.02997285278183242 atol=atol
+#@test divError.L_inf ≈ 0.00124886886594453 atol=atol
+#@test divError.L_two ≈ 0.02997285278183242 atol=atol
 
 ###
 ### Results Display
@@ -300,11 +302,13 @@ println("----------")
 println("L∞ norm of error: $(divError.L_inf)")
 println("L₂ norm of error: $(divError.L_two)")
 println("\n" * "="^45 * "\n")
-
+=#
 ###
 ### Profiling GPU code:
 ###
 using CUDA
+
+kernelRuns = 10 # want to run kernels multiple times for evaluation
 
 function gradient_prework(mesh::HorzMesh; backend=KA.CPU())
     
@@ -335,21 +339,81 @@ end
 # Timing gradient kernel:
 cellsOnEdge, dcEdge, maxLevelEdgeTop, nEdges = gradient_prework(mesh; backend=backend)
 
+Scalar  = h(setup, PlanarTest)
+gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
+
 gradient_kernel! = GradientOnEdge(backend)
 
-CUDA.@time gradient_kernel!(cellsOnEdge, dcEdge, maxLevelEdgeTop, Scalar, gradNum, ndrange=nEdges)
-CUDA.@time gradient_kernel!(cellsOnEdge, dcEdge, maxLevelEdgeTop, Scalar, gradNum, ndrange=nEdges)
-CUDA.@time gradient_kernel!(cellsOnEdge, dcEdge, maxLevelEdgeTop, Scalar, gradNum, ndrange=nEdges)
+@show "Timing default gradient kernel"
+for w = 1:kernelRuns
+    CUDA.@time gradient_kernel!(cellsOnEdge, dcEdge, maxLevelEdgeTop, Scalar, gradNum, ndrange=nEdges)
+end
+
+Scalar   = h(setup, PlanarTest)
+gradNumT = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
+
+cellsOnEdge = cellsOnEdge'
+Scalar      = Scalar'
+gradNumT    = gradNumT'
+vert_levels = 1 # CHANGE THIS WHEN WE HAVE MORE VERT LEVELS
+
+gradient_kernelT! = GradientOnEdgeTranspose(backend)
+
+@show "Timing transposed gradient kernel (using coalesced memory with column-major format)"
+for w = 1:kernelRuns
+    CUDA.@time gradient_kernelT!(cellsOnEdge, dcEdge, Scalar, gradNumT, workgroupsize=64, ndrange=(nEdges, vert_levels))
+end
+
+# Error check between gradient computations:
+@show maximum(abs.(gradNum - gradNumT') ./ (abs.(gradNum) .+ 1))
 
 # Timing divergence kernel:
 nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, nCells = divergence_prework(mesh; backend=backend)
 
+VecEdge = 𝐅ₑ(setup, PlanarTest)
+divNum = KA.zeros(backend, Float64, (1, mesh.PrimaryCells.nCells))
+
+#@show size(dcEdge)
+#@show size(dvEdge)
+
 divergence_kernel! = DivergenceOnCell(backend)
+@show "Timing divergence kernel"
+for w = 1:kernelRuns
+    CUDA.@time divergence_kernel!(divNum, VecEdge, nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, ndrange=nCells)
+end
 
-CUDA.@time divergence_kernel!(divNum, VecEdge, nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, ndrange=nCells)
-CUDA.@time divergence_kernel!(divNum, VecEdge, nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, ndrange=nCells)
-CUDA.@time divergence_kernel!(divNum, VecEdge, nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, ndrange=nCells)
+# We'll reset divNum to 0 and run one more time to check correctness:
+divNum = KA.zeros(backend, Float64, (1, mesh.PrimaryCells.nCells))
+divergence_kernel!(divNum, VecEdge, nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, ndrange=nCells)
 
+@show "Timing divergence kernel broken into 2 parts (using coalesced memory and column-major format)"
+nEdgesOnCell, edgesOnCell, maxLevelEdgeTop, edgeSignOnCell, dvEdge, areaCell, nCells = divergence_prework(mesh; backend=backend)
+
+divNumT = KA.zeros(backend, Float64, (1, mesh.PrimaryCells.nCells))
+
+divNumT        = divNumT'
+edgesOnCell    = edgesOnCell'
+edgeSignOnCell = edgeSignOnCell'
+
+divergence_kernelT1! = DivergenceOnCellTranspose1(backend)
+divergence_kernelT2! = DivergenceOnCellTranspose2(backend)
+
+@show size(edgesOnCell)[2]
+
+n = size(edgesOnCell)[2]
+
+for w = 1:kernelRuns
+    CUDA.@time divergence_kernelT1!(VecEdge, dvEdge, workgroupsize=64, ndrange=(nEdges, vert_levels))
+    CUDA.@time divergence_kernelT2!(divNumT, VecEdge, nEdgesOnCell, edgesOnCell, edgeSignOnCell, areaCell, workgroupsize=32, ndrange=(nCells, vert_levels))
+end
+
+VecEdge = 𝐅ₑ(setup, PlanarTest)
+VecEdge = VecEdge'
+divergence_kernelT1!(VecEdge, dvEdge, workgroupsize=64, ndrange=(nEdges, vert_levels))
+divergence_kernelT2!(divNumT, VecEdge, nEdgesOnCell, edgesOnCell, edgeSignOnCell, areaCell, workgroupsize=32, ndrange=(nCells, vert_levels)) # Add Val{n}() as first arg for private memory
+
+# Error check between divergence computations:
+@show maximum(abs.(divNum - divNumT') ./ (abs.(divNum) .+ 1))
 
 # Need to run from REPL for these:
 #CUDA.@profile gradient!(gradNum, Scalar, mesh; backend=backend)

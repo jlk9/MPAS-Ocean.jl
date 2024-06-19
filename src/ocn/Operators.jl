@@ -22,9 +22,6 @@ using KernelAbstractions
     
     # get inverse cell area
     invArea = 1. / areaCell[iCell]
-
-    # create tmp varibale to store div reduction
-    #div = @localmem eltype(DivCell) (1) 
     
     # loop over number of edges in primary cell
     for i in 1:nEdgesOnCell[iCell]
@@ -38,6 +35,41 @@ using KernelAbstractions
     end
     
     #DivCell[k,iCell] = div * invArea
+
+end
+
+@kernel function DivergenceOnCellTranspose1(VecEdge,
+                                            @Const(dvEdge))
+
+    iEdge, k = @index(Global, NTuple)
+
+    @inbounds VecEdge[iEdge,k] = VecEdge[iEdge,k] * dvEdge[iEdge]
+
+end
+
+@kernel function DivergenceOnCellTranspose2(DivCell, 
+                                            @Const(VecEdge),
+                                            @Const(nEdgesOnCell), 
+                                            @Const(edgesOnCell),
+                                            @Const(edgeSignOnCell),
+                                            @Const(areaCell)) #::Val{n}, where {n}
+
+    iCell, k = @index(Global, NTuple)
+
+    DivCell[iCell,k] = 0.0
+
+    #iEdge_array = @private Float64 (n)
+    #for i in 1:n
+    #    @inbounds iEdge_array[i] = edgesOnCell[iCell,i]
+    #end
+
+    # loop over number of edges in primary cell
+    for i in 1:nEdgesOnCell[iCell]
+        @inbounds iEdge = edgesOnCell[iCell,i]
+        @inbounds DivCell[iCell,k] -= VecEdge[iEdge,k] * edgeSignOnCell[iCell,i]
+    end
+
+    DivCell[iCell,k] = DivCell[iCell,k] / areaCell[iCell]
 
 end
 
@@ -94,6 +126,22 @@ end
         GradEdge[k, iEdge] = InvDcEdge * 
                              (ScalarCell[k, jCell2] - ScalarCell[k, jCell1])
     end
+end
+
+@kernel function GradientOnEdgeTranspose(@Const(cellsOnEdge), 
+                                @Const(dcEdge),
+                                @Const(ScalarCell), 
+                                GradEdge)
+    # global indices over nEdges
+    iEdge, k = @index(Global, NTuple)
+
+    # TODO: add conditional statement to check for masking if needed
+
+    # cell connectivity information for iEdge
+    @inbounds @private jCell1 = cellsOnEdge[iEdge,1]      
+    @inbounds @private jCell2 = cellsOnEdge[iEdge,2]
+
+    @inbounds GradEdge[iEdge, k] = (ScalarCell[jCell2, k] - ScalarCell[jCell1, k]) / dcEdge[iEdge]
 end
 
 function GradientOnEdge!(grad, hᵢ, Mesh::Mesh; backend=KA.CPU())
