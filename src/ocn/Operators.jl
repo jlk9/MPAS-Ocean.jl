@@ -41,6 +41,37 @@ using KernelAbstractions
 
 end
 
+@kernel function DivergenceOnCellModified1(VecEdge, @Const(dvEdge))
+
+    iEdge, k = @index(Global, NTuple)
+    @inbounds VecEdge[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
+end
+
+@kernel function DivergenceOnCellModified2(DivCell, 
+                                            @Const(VecEdge),
+                                            @Const(nEdgesOnCell), 
+                                            @Const(edgesOnCell),
+                                            @Const(edgeSignOnCell),
+                                            @Const(areaCell)) #::Val{n}, where {n}
+
+    iCell, k = @index(Global, NTuple)
+
+    DivCell[k,iCell] = 0.0
+
+    #iEdge_array = @private Float64 (n)
+    #for i in 1:n
+    #    @inbounds iEdge_array[i] = edgesOnCell[i,iCell]
+    #end
+
+    # loop over number of edges in primary cell
+    for i in 1:nEdgesOnCell[iCell]
+        @inbounds iEdge = edgesOnCell[i,iCell]
+        @inbounds DivCell[k,iCell] -= VecEdge[k,iEdge] * edgeSignOnCell[i,iCell]
+    end
+
+    DivCell[k,iCell] = DivCell[k,iCell] / areaCell[iCell]
+end
+
 function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=KA.CPU())
 
     @unpack HorzMesh, VertMesh = Mesh    
@@ -94,6 +125,22 @@ end
         GradEdge[k, iEdge] = InvDcEdge * 
                              (ScalarCell[k, jCell2] - ScalarCell[k, jCell1])
     end
+end
+
+@kernel function GradientOnEdgeModified(@Const(cellsOnEdge), 
+                                        @Const(dcEdge),
+                                        @Const(ScalarCell), 
+                                        GradEdge)
+    # global indices over nEdges
+    iEdge, k = @index(Global, NTuple)
+
+    # TODO: add conditional statement to check for masking if needed
+
+    # cell connectivity information for iEdge
+    @inbounds @private jCell1 = cellsOnEdge[1,iEdge]      
+    @inbounds @private jCell2 = cellsOnEdge[2,iEdge]
+
+    @inbounds GradEdge[k, iEdge] = (ScalarCell[k, jCell2] - ScalarCell[k, jCell1]) / dcEdge[iEdge]
 end
 
 function GradientOnEdge!(grad, hᵢ, Mesh::Mesh; backend=KA.CPU())

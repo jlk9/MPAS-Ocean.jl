@@ -3,13 +3,13 @@ using CUDA
 using UnPack
 using LinearAlgebra
 using CUDA: @allowscalar
-using MOKA: HorzMesh, ReadHorzMesh, GradientOnEdge, DivergenceOnCell, Edge, Cell, Vertex
+using MOKA: HorzMesh, ReadHorzMesh, GradientOnEdge, GradientOnEdgeModified,
+            DivergenceOnCell, DivergenceOnCellModified1, DivergenceOnCellModified2,
+            Edge, Cell, Vertex
 
 using Enzyme
 
 # Setting meshes to inactive types:
-#Enzyme.API.runtimeActivity!(true)
-#Enzyme.API.looseTypeAnalysis!(true)
 Enzyme.EnzymeRules.inactive_type(::Type{<:HorzMesh}) = true
 
 import Adapt
@@ -201,10 +201,12 @@ function gradient!(grad, hᵢ, mesh::HorzMesh; backend=KA.CPU())
     
     # only testing horizontal mesh, so set up dummy array for verticalLevels
     maxLevelEdgeTop = KA.ones(backend, eltype(cellsOnEdge), nEdges)
+    vert_levels = 1
 
-    kernel! = GradientOnEdge(backend)
+    kernel! = GradientOnEdgeModified(backend)
+    #kernel! = GradientOnEdge(backend)
 
-    kernel!(cellsOnEdge, dcEdge, maxLevelEdgeTop, hᵢ, grad, ndrange=nEdges)
+    kernel!(cellsOnEdge, dcEdge, hᵢ, grad, workgroupsize=64, ndrange=(nEdges, vert_levels))
 
     KA.synchronize(backend)
 end
@@ -219,7 +221,22 @@ function divergence!(div, 𝐅ₑ, mesh::HorzMesh; backend=KA.CPU())
 
     # only testing horizontal mesh, so set up dummy array for verticalLevels
     maxLevelEdgeTop = KA.ones(backend, eltype(edgesOnCell), nEdges)
+    vert_levels = 1
     
+    kernel1! = DivergenceOnCellModified1(backend)
+    kernel2! = DivergenceOnCellModified2(backend)
+    
+    kernel1!(𝐅ₑ, dvEdge, workgroupsize=64, ndrange=(nEdges, vert_levels))
+
+    kernel2!(div,
+            𝐅ₑ,
+            nEdgesOnCell,
+            edgesOnCell,
+            edgeSignOnCell,
+            areaCell,
+            workgroupsize=32,
+            ndrange=(nCells, vert_levels))
+    #=
     kernel! = DivergenceOnCell(backend)
     
     kernel!(div,
@@ -231,7 +248,7 @@ function divergence!(div, 𝐅ₑ, mesh::HorzMesh; backend=KA.CPU())
             dvEdge,
             areaCell,
             ndrange=nCells)
-
+    =#
     KA.synchronize(backend)
 end
 
@@ -391,7 +408,9 @@ Enzyme computed $dnorm_dscalar
 Finite differences computed $dnorm_dscalar_fd
 """
 
-# Now let's test divergence:
+###
+### Now let's test divergence:
+###
 function divergence_normSq(div, 𝐅ₑ, mesh::HorzMesh; backend=KA.CPU())
     divergence!(div, 𝐅ₑ, mesh::HorzMesh; backend=KA.CPU())
 
@@ -425,12 +444,15 @@ k = 238
 VecEdgeP[k] = VecEdgeP[k] + abs(VecEdgeP[k]) * ϵ
 VecEdgeM[k] = VecEdgeM[k] - abs(VecEdgeM[k]) * ϵ
 
+VecEdgePk = VecEdgeP[k]
+VecEdgeMk = VecEdgeM[k]
+
 divNum  = KA.zeros(backend, Float64, (1, mesh.PrimaryCells.nCells))
 normSqP = divergence_normSq(divNum, VecEdgeP, mesh)
 divNum  = KA.zeros(backend, Float64, (1, mesh.PrimaryCells.nCells))
 normSqM = divergence_normSq(divNum, VecEdgeM, mesh)
 
-dnorm_dvecedge_fd = (normSqP - normSqM) / (VecEdgeP[k] - VecEdgeM[k])
+dnorm_dvecedge_fd = (normSqP - normSqM) / (VecEdgePk - VecEdgeMk)
 dnorm_dvecedge    = d_VecEdge[k]
 
 @info """ (divergence)\n
