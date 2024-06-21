@@ -203,10 +203,13 @@ function gradient!(grad, hᵢ, mesh::HorzMesh; backend=KA.CPU())
     #maxLevelEdgeTop = KA.ones(backend, eltype(cellsOnEdge), nEdges)
     vert_levels = 1
 
+    # New modified kernel:
     kernel! = GradientOnEdgeModified(backend)
-    #kernel! = GradientOnEdge(backend)
-
     kernel!(cellsOnEdge, dcEdge, hᵢ, grad, workgroupsize=64, ndrange=(nEdges, vert_levels))
+
+    # Older
+    #kernel! = GradientOnEdge(backend)
+    #kernel!(cellsOnEdge, dcEdge, maxLevelEdgeTop, hᵢ, grad, workgroupsize=64, ndrange=(nEdges, vert_levels))
 
     KA.synchronize(backend)
 end
@@ -359,7 +362,9 @@ d_gradient = autodiff(Enzyme.Reverse,
 
 # As a cleaner / easier to read test, let's create an outer function that measures the norm of the gradient computed by kernel:
 function gradient_normSq(grad, hᵢ, mesh::HorzMesh; backend=KA.CPU())
-    gradient!(grad, hᵢ, mesh::HorzMesh; backend=KA.CPU())
+    gradient!(grad, hᵢ, mesh::HorzMesh; backend=backend)
+
+    #@show grad
 
     normSq = 0.0
     N = size(grad)
@@ -388,6 +393,8 @@ d_normSq = autodiff(Enzyme.Reverse,
 #@show d_Scalar
 
 # For comparison, let's compute the derivative by hand for a given scalar entry:
+gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
+Scalar  = h(setup, PlanarTest)
 ScalarP = deepcopy(Scalar)
 ScalarM = deepcopy(Scalar)
 
@@ -397,7 +404,13 @@ ScalarP[k] = ScalarP[k] + abs(ScalarP[k]) * ϵ
 ScalarM[k] = ScalarM[k] - abs(ScalarM[k]) * ϵ
 
 normSqP = gradient_normSq(gradNum, ScalarP, mesh)
+gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
 normSqM = gradient_normSq(gradNum, ScalarM, mesh)
+
+@show normSqP
+@show normSqM
+@show ScalarP[k]
+@show ScalarM[k]
 
 dnorm_dscalar_fd = (normSqP - normSqM) / (ScalarP[k] - ScalarM[k])
 dnorm_dscalar    = d_Scalar[k]
@@ -412,7 +425,7 @@ Finite differences computed $dnorm_dscalar_fd
 ### Now let's test divergence:
 ###
 function divergence_normSq(div, 𝐅ₑ, mesh::HorzMesh; backend=KA.CPU())
-    divergence!(div, 𝐅ₑ, mesh::HorzMesh; backend=KA.CPU())
+    divergence!(div, 𝐅ₑ, mesh::HorzMesh; backend=backend)
 
     normSq = 0.0
     N = size(div)
