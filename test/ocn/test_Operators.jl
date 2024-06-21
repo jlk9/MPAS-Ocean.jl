@@ -193,7 +193,7 @@ function ∇hₑ(test::TestSetup, ::Type{TC}) where {TC <: TestCase}
     return @. EdgeNormalX * ∂hᵢ∂x + EdgeNormalY * ∂hᵢ∂y
 end
 
-function gradient!(grad, hᵢ, mesh::HorzMesh; backend=KA.CPU())
+function gradient!(grad, hᵢ, mesh::HorzMesh; backend=CUDABackend())
     
     @unpack Edges = mesh
 
@@ -267,8 +267,8 @@ mesh_fn  = "MokaMesh.nc"
 
 Downloads.download(mesh_url, mesh_fn)
 
-backend = KA.CPU()
-#backend = CUDABackend();
+#backend = KA.CPU()
+backend = CUDABackend();
 
 mesh = ReadHorzMesh(mesh_fn; backend=backend)
 setup = TestSetup(mesh, PlanarTest; backend=backend)
@@ -333,7 +333,7 @@ println("\n" * "="^45 * "\n")
 ### Here, we will test Enzyme AD on our kernels
 ###
 
-#=
+
 # For gradient, we need to create shadows for all the primals:
 gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
 Scalar  = h(setup, PlanarTest)
@@ -342,7 +342,7 @@ d_gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
 d_Scalar  = KA.zeros(backend, eltype(setup.xᶜ), (1, size(setup.xᶜ)[1]))
 d_mesh    = Enzyme.make_zero(mesh)
 
-d_gradNum[1] = 1.0
+#d_gradNum[1] = 1.0
 
 #@show gradNum
 #@show Scalar
@@ -358,19 +358,22 @@ d_gradient = autodiff(Enzyme.Reverse,
 
 #@show d_gradNum
 #@show d_Scalar
-=#
 
+#=
 # As a cleaner / easier to read test, let's create an outer function that measures the norm of the gradient computed by kernel:
-function gradient_normSq(grad, hᵢ, mesh::HorzMesh; backend=KA.CPU())
+function gradient_normSq(grad, hᵢ, mesh::HorzMesh; backend=CUDABackend())
     gradient!(grad, hᵢ, mesh::HorzMesh; backend=backend)
 
     #@show grad
 
+    #=
     normSq = 0.0
     N = size(grad)
     for i = 1:N[2]
         normSq += grad[i]^2
     end
+    =#
+    normSq = sum(grad .* grad)
 
     return normSq
 end
@@ -424,7 +427,7 @@ Finite differences computed $dnorm_dscalar_fd
 ###
 ### Now let's test divergence:
 ###
-function divergence_normSq(div, 𝐅ₑ, mesh::HorzMesh; backend=KA.CPU())
+function divergence_normSq(div, 𝐅ₑ, mesh::HorzMesh; backend=CUDABackend())
     divergence!(div, 𝐅ₑ, mesh::HorzMesh; backend=backend)
 
     normSq = 0.0
@@ -473,3 +476,4 @@ For cell global index $k
 Enzyme computed $dnorm_dvecedge
 Finite differences computed $dnorm_dvecedge_fd
 """
+=#
