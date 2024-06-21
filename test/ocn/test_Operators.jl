@@ -200,7 +200,7 @@ function gradient!(grad, hᵢ, mesh::HorzMesh; backend=KA.CPU())
     @unpack nEdges, dcEdge, cellsOnEdge = Edges
     
     # only testing horizontal mesh, so set up dummy array for verticalLevels
-    maxLevelEdgeTop = KA.ones(backend, eltype(cellsOnEdge), nEdges)
+    #maxLevelEdgeTop = KA.ones(backend, eltype(cellsOnEdge), nEdges)
     vert_levels = 1
 
     kernel! = GradientOnEdgeModified(backend)
@@ -220,7 +220,7 @@ function divergence!(div, 𝐅ₑ, mesh::HorzMesh; backend=KA.CPU())
     @unpack edgesOnCell, edgeSignOnCell, areaCell = PrimaryCells
 
     # only testing horizontal mesh, so set up dummy array for verticalLevels
-    maxLevelEdgeTop = KA.ones(backend, eltype(edgesOnCell), nEdges)
+    #maxLevelEdgeTop = KA.ones(backend, eltype(edgesOnCell), nEdges)
     vert_levels = 1
     
     kernel1! = DivergenceOnCellModified1(backend)
