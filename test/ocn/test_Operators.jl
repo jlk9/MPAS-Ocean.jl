@@ -333,16 +333,18 @@ println("\n" * "="^45 * "\n")
 ### Here, we will test Enzyme AD on our kernels
 ###
 
+k = 1
 
 # For gradient, we need to create shadows for all the primals:
 gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
 Scalar  = h(setup, PlanarTest)
 
-d_gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
 d_Scalar  = KA.zeros(backend, eltype(setup.xᶜ), (1, size(setup.xᶜ)[1]))
 d_mesh    = Enzyme.make_zero(mesh)
 
-#d_gradNum[1] = 1.0
+d_gradNum = KA.zeros(KA.CPU(), Float64, (1, mesh.Edges.nEdges))
+d_gradNum[k] = 1.0
+d_gradNum = CuArray(d_gradNum)
 
 #@show gradNum
 #@show Scalar
@@ -356,8 +358,24 @@ d_gradient = autodiff(Enzyme.Reverse,
 #@show gradNum
 #@show Scalar
 
-#@show d_gradNum
-#@show d_Scalar
+d_Scalar_CPU = KA.zeros(KA.CPU(), eltype(setup.xᶜ), (1, size(setup.xᶜ)[1]))
+cellsOnEdge_CPU = KA.zeros(KA.CPU(), eltype(mesh.Edges.cellsOnEdge), size(mesh.Edges.cellsOnEdge))
+copyto!(d_Scalar_CPU, d_Scalar)
+copyto!(cellsOnEdge_CPU, mesh.Edges.cellsOnEdge)
+@show k
+println("The negative and positive components of the derivative for the k-th edge:")
+@show d_Scalar_CPU[cellsOnEdge_CPU[1,k]]
+@show d_Scalar_CPU[cellsOnEdge_CPU[2,k]]
+
+d_Scalar_CPU[cellsOnEdge_CPU[1,k]] = 0
+d_Scalar_CPU[cellsOnEdge_CPU[2,k]] = 0
+
+@show "The max of the rest of the edges (should be 0):"
+@show maximum.(abs.(d_Scalar_CPU))
+
+#@show "The d_gradNum array (should be 0)"
+#@show maximum.(abs.(array(d_gradNum)))
+
 
 #=
 # As a cleaner / easier to read test, let's create an outer function that measures the norm of the gradient computed by kernel:
