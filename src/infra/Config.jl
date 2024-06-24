@@ -229,7 +229,7 @@ function MPAS_Custom_Constructor()
 end
 
 
-function compose(events; resolver::Union{Resolver, Nothing}=nothing)
+function compose_MPAS(events; resolver::Union{Resolver, Nothing}=nothing)
     # if no resolver was passed, return default resolver. 
     # otherwise use resolver passed as kwarg 
     resolver = resolver ==  nothing ? Resolver : resolver 
@@ -245,7 +245,7 @@ function compose(events; resolver::Union{Resolver, Nothing}=nothing)
 end 
 
 load(ts::TokenStream, constructor::Constructor; resolver::Resolver) = 
-    construct_document(constructor, compose(EventStream(ts); resolver=resolver))
+    construct_document(constructor, compose_MPAS(EventStream(ts); resolver=resolver))
 
 load(input::IO, constructor::Constructor; kwargs...) = load(TokenStream(input), constructor; kwargs...)
 
