@@ -80,10 +80,31 @@ end
 d_gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
 d_mesh    = Enzyme.make_zero(mesh)
 
+old_mesh = deepcopy(mesh)
+
 d_normSq = autodiff(Enzyme.Reverse,
                     gradient_normSq,
                     Duplicated(gradNum, d_gradNum),
                     Duplicated(mesh, d_mesh))
+
+@show isequal(mesh.PrimaryCells, old_mesh.PrimaryCells)
+@show isequal(mesh.DualCells, old_mesh.DualCells)
+
+@show isequal(mesh.Edges.nEdges, old_mesh.Edges.nEdges)
+@show isequal(mesh.Edges.xᵉ, old_mesh.Edges.xᵉ)
+@show isequal(mesh.Edges.yᵉ, old_mesh.Edges.yᵉ)
+@show isequal(mesh.Edges.zᵉ, old_mesh.Edges.zᵉ)
+@show isequal(mesh.Edges.fᵉ, old_mesh.Edges.fᵉ)
+@show isequal(mesh.Edges.nEdgesOnEdge, old_mesh.Edges.nEdgesOnEdge)
+@show isequal(mesh.Edges.cellsOnEdge, old_mesh.Edges.cellsOnEdge)
+@show isequal(mesh.Edges.verticesOnEdge, old_mesh.Edges.verticesOnEdge)
+@show isequal(mesh.Edges.edgesOnEdge, old_mesh.Edges.edgesOnEdge)
+@show isequal(mesh.Edges.weightsOnEdge, old_mesh.Edges.weightsOnEdge)
+@show isequal(mesh.Edges.dvEdge, old_mesh.Edges.dvEdge)
+@show isequal(mesh.Edges.dcEdge, old_mesh.Edges.dcEdge)
+@show isequal(mesh.Edges.angleEdge, old_mesh.Edges.angleEdge)
+
+mesh.Edges.dcEdge[:] = old_mesh.Edges.dcEdge[:]
 
 # For comparison, let's compute the derivative by hand for a given scalar entry:
 gradNumP = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
