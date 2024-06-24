@@ -364,7 +364,7 @@ d_gradient = autodiff(Enzyme.Reverse,
 function gradient_normSq(grad, hᵢ, mesh::HorzMesh; backend=KA.CPU())
     gradient!(grad, hᵢ, mesh::HorzMesh; backend=backend)
 
-    @show grad
+    #@show grad
 
     normSq = 0.0
     N = size(grad)
