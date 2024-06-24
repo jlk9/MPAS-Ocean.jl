@@ -87,7 +87,7 @@ function ConfigRead(filepath::AbstractString)
     # load YAML file where dictionary keys are forced to types defined in 
     # the dictionary above. 
     config = open(filepath, "r") do input
-        load(input, MPAS_Custom_Constructor(); resolver=MPAS_Custom_Resolver())
+        load_MPAS(input, MPAS_Custom_Constructor(); resolver=MPAS_Custom_Resolver())
     end 
 
     # Extract the "streams" dictionary from the namelist dictionary 
@@ -244,8 +244,8 @@ function compose_MPAS(events; resolver::Union{Resolver, Nothing}=nothing)
     node
 end 
 
-load(ts::TokenStream, constructor::Constructor; resolver::Resolver) = 
+load_MPAS(ts::TokenStream, constructor::Constructor; resolver::Resolver) = 
     construct_document(constructor, compose_MPAS(EventStream(ts); resolver=resolver))
 
-load(input::IO, constructor::Constructor; kwargs...) = load(TokenStream(input), constructor; kwargs...)
+load_MPAS(input::IO, constructor::Constructor; kwargs...) = load_MPAS(TokenStream(input), constructor; kwargs...)
 
