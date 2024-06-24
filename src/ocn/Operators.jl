@@ -45,6 +45,7 @@ end
 
     iEdge, k = @index(Global, NTuple)
     @inbounds VecEdge[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
+    @synchronize()
 end
 
 @kernel function DivergenceOnCellModified2(DivCell, 
@@ -70,6 +71,7 @@ end
     end
 
     DivCell[k,iCell] = DivCell[k,iCell] / areaCell[iCell]
+    @synchronize()
 end
 
 function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=KA.CPU())
@@ -141,6 +143,8 @@ end
     @inbounds @private jCell2 = cellsOnEdge[2,iEdge]
 
     @inbounds GradEdge[k, iEdge] = (ScalarCell[k, jCell2] - ScalarCell[k, jCell1]) / dcEdge[iEdge]
+
+    @synchronize()
 end
 
 function GradientOnEdge!(grad, hᵢ, Mesh::Mesh; backend=KA.CPU())
