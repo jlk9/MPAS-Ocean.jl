@@ -111,8 +111,55 @@ function GradientOnEdge!(grad, hᵢ, Mesh::Mesh; backend=KA.CPU())
     KA.synchronize(backend)
 end
 
+
+@kernel function CurlOnVertex(CurlVertex,
+                              @Const(VecEdge),
+                              @Const(edgesOnVertex),
+                              @Const(maxLevelVertexBot), 
+                              @Const(dcEdge), 
+                              @Const(edgeSignOnVertex), 
+                              @Const(areaTriangle))
+
+    # global indicies over nVertices and vertexDegree
+    iVertex, j = @index(Global, NTuple)
+    
+    invAreaTriagle = 1.0 / areaTriangle[iVertex]
+    
+    iEdge = edgesOnVertex[j, iVertex]
+
+    for k in 1:maxLevelVertexBot[iVertex]
+        CurlVertex[k, iVertex] = dcEdge[iEdge] * VecEdge[k, iEdge] *
+                                 invAreaTriangle * edgeSignOnVertex[j, iVertex]
+    end
+end
+
+function CurlOnVertex!(CurlVertex, VecEdge, Mesh::Mesh; backend = KA.CPU())
+
+    @unpack HorzMesh, VertMesh = Mesh    
+
+    @unpack maxLevelVertex = VertMesh 
+    @unpack DualCells, Edges = HorzMesh
+
+    @unpack dcEdge = Edges
+    @unpack nVertices, vertexDegree = DualCells
+    @unpack areaTriangle, edgeSignOnVertex, edgesOnVertex = DualCells
+
+    kernel! = CurlOnVertex(backend)
+
+    kernel!(CurlVertex,
+            VecEdge,
+            edgesOnVertex,
+            maxLevelVertex.Bot,
+            dcEdge,
+            edgeSignOnVertex,
+            areaTriangle, 
+            ndrange = (nVertices, vertexDegree))
+
+    KA.synchronize(backend)
+end
+
 #@doc raw"""
-#"""
+#""
 #@kernel function TangentialReconOnEdge(@Const(nEdgesOnEdge),
 #                                       @Const(edgesOnEdge),
 #                                       @Const(weightsOnEdge),
