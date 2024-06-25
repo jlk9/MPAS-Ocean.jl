@@ -10,7 +10,7 @@ using MOKA: HorzMesh, ReadHorzMesh, GradientOnEdge, GradientOnEdgeModified,
 using Enzyme
 
 # Setting meshes to inactive types:
-Enzyme.EnzymeRules.inactive_type(::Type{<:HorzMesh}) = true
+#Enzyme.EnzymeRules.inactive_type(::Type{<:HorzMesh}) = true
 
 import Adapt
 import Downloads
@@ -364,8 +364,6 @@ d_gradient = autodiff(Enzyme.Reverse,
 function gradient_normSq(grad, hᵢ, mesh::HorzMesh; backend=KA.CPU())
     gradient!(grad, hᵢ, mesh::HorzMesh; backend=backend)
 
-    @show grad
-
     normSq = 0.0
     N = size(grad)
     for i = 1:N[2]
@@ -406,11 +404,6 @@ ScalarM[k] = ScalarM[k] - abs(ScalarM[k]) * ϵ
 normSqP = gradient_normSq(gradNum, ScalarP, mesh)
 gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))
 normSqM = gradient_normSq(gradNum, ScalarM, mesh)
-
-@show normSqP
-@show normSqM
-@show ScalarP[k]
-@show ScalarM[k]
 
 dnorm_dscalar_fd = (normSqP - normSqM) / (ScalarP[k] - ScalarM[k])
 dnorm_dscalar    = d_Scalar[k]
