@@ -19,7 +19,6 @@ Enzyme.EnzymeRules.inactive_type(::Type{T} where T <:HorzMesh) = true
     @synchronize()
 end
 
-# As a cleaner / easier to read test, let's create an outer function that measures the norm of the gradient computed by kernel:
 function gradient_normSq(grad, mesh::HorzMesh; backend=KA.CPU())
 
     nEdges = size(grad)[2]
@@ -64,22 +63,6 @@ d_normSq = autodiff(Enzyme.Reverse,
                     Duplicated(gradNum, d_gradNum),
                     Duplicated(mesh, d_mesh))
 
-@show isequal(mesh.PrimaryCells, old_mesh.PrimaryCells)
-@show isequal(mesh.DualCells, old_mesh.DualCells)
+#gradient_normSq(gradNum, mesh)
 
-@show isequal(mesh.Edges.nEdges, old_mesh.Edges.nEdges)
-@show isequal(mesh.Edges.xᵉ, old_mesh.Edges.xᵉ)
-@show isequal(mesh.Edges.yᵉ, old_mesh.Edges.yᵉ)
-@show isequal(mesh.Edges.zᵉ, old_mesh.Edges.zᵉ)
-@show isequal(mesh.Edges.fᵉ, old_mesh.Edges.fᵉ)
-@show isequal(mesh.Edges.nEdgesOnEdge, old_mesh.Edges.nEdgesOnEdge)
-@show isequal(mesh.Edges.cellsOnEdge, old_mesh.Edges.cellsOnEdge)
-@show isequal(mesh.Edges.verticesOnEdge, old_mesh.Edges.verticesOnEdge)
-@show isequal(mesh.Edges.edgesOnEdge, old_mesh.Edges.edgesOnEdge)
-@show isequal(mesh.Edges.weightsOnEdge, old_mesh.Edges.weightsOnEdge)
-@show isequal(mesh.Edges.dvEdge, old_mesh.Edges.dvEdge)
 @show isequal(mesh.Edges.dcEdge, old_mesh.Edges.dcEdge)
-@show isequal(mesh.Edges.angleEdge, old_mesh.Edges.angleEdge)
-
-#@show old_mesh.Edges.dcEdge
-#@show mesh.Edges.dcEdge
