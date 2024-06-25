@@ -42,7 +42,7 @@ end
 
 mesh_fn  = "MokaMesh.nc"
 
-mesh = ReadHorzMesh(mesh_fn; backend=backend)
+mesh = ReadHorzMesh(mesh_fn)
 
 # Let's recreate all the variables:
 gradNum = KA.zeros(backend, Float64, (1, mesh.Edges.nEdges))

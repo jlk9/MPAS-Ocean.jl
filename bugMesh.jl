@@ -1,9 +1,5 @@
 using NCDatasets
 
-### 
-### Horizontal mesh struct
-###
-
 """
     HorzMesh
 
@@ -35,7 +31,7 @@ function readEdgeInfo(ds)
           dcEdge = dcEdge)
 end
 
-function ReadHorzMesh(meshPath::String; backend=KA.CPU())
+function ReadHorzMesh(meshPath::String)
     
     ds    = NCDataset(meshPath, "r", format=:netcdf4)
     edges = readEdgeInfo(ds)
