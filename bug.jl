@@ -6,32 +6,9 @@ import Downloads
 import KernelAbstractions as KA
 
 backend = KA.CPU()
-#=
-"""
-    HorzMesh
 
-A struct, comprised of SoA, describing a 2-D TRiSK mesh
-"""
-struct HorzMesh{ET}
-    Edges::ET
-end
-
-# these are line segments
-@kwdef struct Edges{I,FV} 
-    dcEdge::FV
-    nEdges::I
-end
-
-edgeArray = KA.zeros(backend, Float64, 2306)
-for i = 1:2306
-    edgeArray[i] = i + rand()
-end
-
-edges = Edges(edgeArray, 2306)
-mesh = HorzMesh(edges)
-=#
 # Setting meshes to inactive types:
-Enzyme.EnzymeRules.inactive_type(::Type{<:HorzMesh}) = true
+Enzyme.EnzymeRules.inactive_type(::Type{T} where T <:HorzMesh) = true
 
 @kernel function GradientOnEdgeModified(@Const(dcEdge), GradEdge)
     # global indices over nEdges
@@ -54,7 +31,7 @@ function gradient_normSq(grad, mesh::HorzMesh; backend=KA.CPU())
 
     KA.synchronize(backend)
 
-    @show grad
+    #@show grad
 
     normSq = 0.0
     for i = 1:nEdges
@@ -104,5 +81,5 @@ d_normSq = autodiff(Enzyme.Reverse,
 @show isequal(mesh.Edges.dcEdge, old_mesh.Edges.dcEdge)
 @show isequal(mesh.Edges.angleEdge, old_mesh.Edges.angleEdge)
 
-@show old_mesh.Edges.dcEdge
-@show mesh.Edges.dcEdge
+#@show old_mesh.Edges.dcEdge
+#@show mesh.Edges.dcEdge
