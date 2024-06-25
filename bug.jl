@@ -1,11 +1,11 @@
-using MOKA: HorzMesh, ReadHorzMesh
 using KernelAbstractions
 using Enzyme
 
-import Downloads
 import KernelAbstractions as KA
 
 backend = KA.CPU()
+
+include("./bugMesh.jl")
 
 # Setting meshes to inactive types:
 Enzyme.EnzymeRules.inactive_type(::Type{T} where T <:HorzMesh) = true
@@ -40,10 +40,7 @@ function gradient_normSq(grad, mesh::HorzMesh; backend=KA.CPU())
     return normSq
 end
 
-mesh_url = "https://gist.github.com/mwarusz/f8caf260398dbe140d2102ec46a41268/raw/e3c29afbadc835797604369114321d93fd69886d/PlanarPeriodic48x48.nc"
 mesh_fn  = "MokaMesh.nc"
-
-Downloads.download(mesh_url, mesh_fn)
 
 mesh = ReadHorzMesh(mesh_fn; backend=backend)
 
