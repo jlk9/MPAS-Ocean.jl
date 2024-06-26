@@ -26,7 +26,7 @@ function write_netcdf(Setup::ModelSetup,
     maxEdges = PrimaryCells.maxEdges
     TWO = 2
 
-    # hardcode everything for now out of convience
+    # hardcode everything for now out of convenience
     defDim(ds,"time",1)
     defDim(ds,"nCells", nCells)
     defDim(ds,"nEdges", nEdges)
