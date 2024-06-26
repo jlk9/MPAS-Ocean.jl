@@ -17,7 +17,7 @@ function advanceTimeLevels!(Prog::PrognosticVars)
         field = circshift(field, dims)
 
         # some short hand for this would be nice
-        if field_name == :ssh 
+        if ndims(field) == 2
             field[:,end] = field[:,end-1]
         else
             field[:,:,end] = field[:,:,end-1]
@@ -160,7 +160,7 @@ function ocn_timestep(Prog::PrognosticVars,
     #layerThickness[:,:,end] .= Diag.restingThickness[:,:] .+ reshape(Prog.ssh[:,end], 1, :) 
 
     layerThickness[:,:,end] .+= dt .* tendLayerThickness 
-    ssh[:,end] = layerThickness[:,:,end] .- sum(Mesh.VertMesh.restingThickness; dims=1)
+    #ssh[:,end] = layerThickness[:,:,end] .- sum(Mesh.VertMesh.restingThickness; dims=1)
 
     
     # pack the updated state varibales in the Prognostic structure
