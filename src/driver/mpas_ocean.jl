@@ -57,6 +57,7 @@ function ocn_run(config_fp)
     d_simulationAlarm = Enzyme.make_zero(simulationAlarm)
     d_outputAlarm = Enzyme.make_zero(outputAlarm)
 
+    #=
     autodiff(Enzyme.Reverse,
              ocn_run_loop,
              Duplicated(Prog, d_Prog),
@@ -68,8 +69,8 @@ function ocn_run(config_fp)
              Duplicated(simulationAlarm, d_simulationAlarm),
              Duplicated(outputAlarm, d_outputAlarm),
              )
-
-    #ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
+    =#
+    ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
 
     #
     # Writing to outputs

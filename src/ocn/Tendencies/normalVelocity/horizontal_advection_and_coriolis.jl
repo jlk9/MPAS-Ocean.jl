@@ -24,7 +24,7 @@ function horizontal_advection_and_coriolis_tendency!(Tend::TendencyVars,
     @unpack weightsOnEdge, fᵉ, cellsOnEdge, edgesOnEdge = Edges
 
     # get the current timelevel of normalVelocity
-    normalVelocity = @view Prog.normalVelocity[:,:,end]
+    normalVelocity = Prog.normalVelocity
     # unpack the normal velocity tendency term
     @unpack tendNormalVelocity = Tend 
 
@@ -67,7 +67,7 @@ end
 
         @inbounds for k in 1:maxLevelEdgeTop[iEdge]
             tendency[k,iEdge] += weightsOnEdge[i,iEdge] *
-                                 normalVelocity[k, eoe] *
+                                 normalVelocity[k, eoe, 2] *
                                  fᵉ[eoe]
         end
     end

@@ -18,7 +18,7 @@ function pressure_gradient_tendency!(Tend::TendencyVars,
     @unpack nEdges, dcEdge, cellsOnEdge = Edges
    
     # get the current timelevel of ssh 
-    ssh = Prog.ssh[:,end]
+    ssh = Prog.ssh #[:,end]
     # unpack the normal velocity tendency term
     @unpack tendNormalVelocity = Tend 
     
@@ -56,6 +56,6 @@ end
   
     for k in 1:maxLevelEdgeTop[iEdge]
         # gradient on edges calculation 
-        tendency[k, iEdge] -= 9.80616 * InvDcEdge * (ssh[jCell2] - ssh[jCell1])
+        tendency[k, iEdge] -= 9.80616 * InvDcEdge * (ssh[jCell2,2] - ssh[jCell1,2])
     end
 end
