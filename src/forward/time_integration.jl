@@ -159,8 +159,16 @@ function ocn_timestep(Prog::PrognosticVars,
     #ssh[:,end] = exact_ssh(iGE, time) 
     #layerThickness[:,:,end] .= Diag.restingThickness[:,:] .+ reshape(Prog.ssh[:,end], 1, :) 
 
-    layerThickness[:,:,end] .+= dt .* tendLayerThickness 
-    #ssh[:,end] = layerThickness[:,:,end] .- sum(Mesh.VertMesh.restingThickness; dims=1)
+    layerThickness[:,:,end] .+= dt .* tendLayerThickness
+
+    ssh[:,end] = layerThickness[1,:,end]
+
+    for j =1:size(ssh)[1]
+        ssh[j,end] = ssh[j,end] - Mesh.VertMesh.restingThicknessSum[j]
+    end
+
+    @show size(ssh)
+    @show size(layerThickness)
 
     
     # pack the updated state varibales in the Prognostic structure

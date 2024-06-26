@@ -15,6 +15,9 @@ mutable struct VerticalMesh{I, IV, FV, AL}
     # var: Layer thickness when the ocean is at rest [m]
     # dim: (nVertLevels, nCells)
     restingThickness::FV
+    # var: Total thickness when the ocean is at rest [m]
+    # dim: (1, nCells)
+    restingThicknessSum::FV
 end
 
 mutable struct ActiveLevels{IV}
@@ -52,12 +55,15 @@ function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
     ActiveLevelsEdge = ActiveLevels{Edge}(mesh; backend=backend)
     ActiveLevelsVertex = ActiveLevels{Vertex}(mesh; backend=backend)
 
+    restingThicknessSum = sum(restingThickness; dims=1)
+
     VerticalMesh(nVertLevels,
                  Adapt.adapt(backend, minLevelCell),
                  Adapt.adapt(backend, maxLevelCell),
                  ActiveLevelsEdge,
                  ActiveLevelsVertex, 
-                 Adapt.adapt(backend, restingThickness))
+                 Adapt.adapt(backend, restingThickness),
+                 Adapt.adapt(backend, restingThicknessSum))
 end
 
 function Adapt.adapt_structure(backend, x::ActiveLevels)
@@ -71,6 +77,7 @@ function Adapt.adapt_structure(backend, x::VerticalMesh)
                         Adapt.adapt(backend, x.maxLevelCell),
                         Adapt.adapt(backend, x.maxLevelEdge),
                         Adapt.adapt(backend, x.maxLevelVertex),
-                        Adapt.adapt(backend, x.restingThickness))
+                        Adapt.adapt(backend, x.restingThickness),
+                        Adapt.adapt(backend, x.restingThicknessSum))
 end
 
