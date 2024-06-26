@@ -53,6 +53,14 @@ function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
     maxLevelCell = ds["maxLevelCell"][:]
     restingThickness = ds["restingThickness"][:,:,1]
 
+    # check that the vertical mesh is stacked 
+    if !all(maxLevelCell .== nVertLevels)
+        @error """ (Vertical Mesh Initializaton)\n
+               Vertical Mesh is not stacked. Must implement vertical masking
+               before this mesh can be used
+               """
+    end
+
     ActiveLevelsEdge = ActiveLevels{Edge}(mesh; backend=backend,
                                           nVertLevels=nVertLevels)
     ActiveLevelsVertex = ActiveLevels{Vertex}(mesh; backend=backend, 
