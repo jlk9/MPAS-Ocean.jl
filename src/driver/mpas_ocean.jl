@@ -6,8 +6,6 @@ using KernelAbstractions
 
 using Enzyme
 
-Enzyme.API.maxtypedepth!(10)
-
 
 #Enzyme.EnzymeRules.inactive_type(::Type{<:ModelSetup}) = true
 #Enzyme.EnzymeRules.inactive_type(::Type{<:Clock}) = true
