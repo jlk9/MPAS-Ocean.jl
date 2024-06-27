@@ -146,8 +146,8 @@ end
     # TODO: add conditional statement to check for masking if needed
 
     # cell connectivity information for iEdge
-    @inbounds @private jCell1 = cellsOnEdge[1,iEdge]      
-    @inbounds @private jCell2 = cellsOnEdge[2,iEdge]
+    @inbounds @private iCell1 = cellsOnEdge[1,iEdge]      
+    @inbounds @private iCell2 = cellsOnEdge[2,iEdge]
 
     @inbounds edgeValue[k, iEdge] = 0.5 * (cellValue[k, iCell1] +
                                            cellValue[k, iCell2])
