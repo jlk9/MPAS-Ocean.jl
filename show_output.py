@@ -11,9 +11,11 @@ rootgrp = nc.Dataset(output_file, "r", format="NETCDF4")
 
 print(rootgrp)
 
+ssh            = rootgrp["ssh"][:]
 layerThickness = rootgrp["layerThickness"][:]
 normalVelocity = rootgrp["normalVelocity"][:]
 
+print(ssh, ssh.shape)
 print(layerThickness, layerThickness.shape)
 print(normalVelocity, normalVelocity.shape)
 
