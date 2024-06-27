@@ -6,9 +6,9 @@ using KernelAbstractions
 
 using Enzyme
 
-
-#Enzyme.EnzymeRules.inactive_type(::Type{<:ModelSetup}) = true
-#Enzyme.EnzymeRules.inactive_type(::Type{<:Clock}) = true
+# Might need to remove these:
+#Enzyme.EnzymeRules.inactive_type(::Type{<:MOKA.ModelSetup}) = true
+#Enzyme.EnzymeRules.inactive_type(::Type{<:MOKA.Clock}) = true
 
 const KA=KernelAbstractions
 
@@ -59,8 +59,21 @@ function ocn_run(config_fp)
 
     #@show d_Setup.mesh.VertMesh.restingThicknessSum
 
-    
-    autodiff(Enzyme.Reverse,
+    # Let's see how to increase the variation in ocean ssh:
+    #=
+    for j = 1:size(Prog.ssh)[end]
+        if Prog.ssh[j] > 0
+            d_Prog.ssh[j] = 1.0
+        elseif Prog.ssh[j] < 0
+            d_Prog.ssh[j] = -1.0
+        end
+    end
+    =#
+    #d_Prog.layerThickness[1,1,1] = 1.0
+
+    #old_Prog = deepcopy(Prog)
+    #=
+    d_sum = autodiff(Enzyme.Reverse,
              ocn_run_loop,
              Duplicated(Prog, d_Prog),
              Duplicated(Diag, d_Diag),
@@ -71,7 +84,21 @@ function ocn_run(config_fp)
              Duplicated(simulationAlarm, d_simulationAlarm),
              Duplicated(outputAlarm, d_outputAlarm),
              )
+    =#
+    autodiff(Enzyme.Reverse,
+             ocn_timestep_ForwardEuler,
+             Duplicated(Prog, d_Prog),
+             Duplicated(Diag, d_Diag),
+             Duplicated(Tend, d_Tend),
+             Duplicated(Setup, d_Setup))
     
+    #ocn_timestep_ForwardEuler(Prog, Diag, Tend, Setup; backend=backend)
+    #=
+    @show Prog.ssh - old_Prog.ssh
+    @show Prog.layerThickness - old_Prog.layerThickness
+    @show Prog.normalVelocity - old_Prog.normalVelocity
+    =#
+
     #ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
 
     #
@@ -79,7 +106,7 @@ function ocn_run(config_fp)
     #
     
     # Only suport i/o at the end of the simulation for now 
-    write_netcdf(Setup, Diag, Prog)
+    write_netcdf(Setup, Diag, Prog, d_Prog)
     
     backend = get_backend(Tend.tendNormalVelocity)
     arch = typeof(backend) <: KA.GPU ? "GPU" : "CPU" 
@@ -89,21 +116,32 @@ function ocn_run(config_fp)
 end
 
 function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=KA.CPU())
-    global i = 0
+    #global i = 0
     # Run the model 
-    while !isRinging(simulationAlarm)
+    #while !isRinging(simulationAlarm)
+    for i = 1:90
     
         advance!(clock)
     
-        global i += 1
+        #global i += 1
     
-        ocn_timestep(Prog, Diag, Tend, Setup, ForwardEuler; backend=backend)
+        ocn_timestep_ForwardEuler(Prog, Diag, Tend, Setup; backend=backend)
         
         if isRinging(outputAlarm)
             # should be doing i/o in here, using a i/o struct
             reset!(outputAlarm)
         end
-    end 
+    end
+
+    sum = 0.0
+    ssh_length = size(Prog.ssh)[1]
+    for j = 1:ssh_length
+        sum = sum + Prog.ssh[j]^2
+    end
+
+    @show sum
+
+    return sum
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__

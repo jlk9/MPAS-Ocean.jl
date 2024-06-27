@@ -1,6 +1,7 @@
 function write_netcdf(Setup::ModelSetup,
                       Diag::DiagnosticVars,
-                      Prog::PrognosticVars)
+                      Prog::PrognosticVars,
+                      d_Prog::PrognosticVars)
 
     # copy the data structures back to the CPU
     Mesh = Adapt.adapt_structure(KA.CPU(), Setup.mesh)
@@ -69,6 +70,11 @@ function write_netcdf(Setup::ModelSetup,
     ssh = defVar(ds,"ssh",Float64,("nCells","time"))
     layerThickness = defVar(ds,"layerThickness",Float64,("nCells","nVertLevels","time"))
     normalVelocity = defVar(ds,"normalVelocity",Float64,("nEdges","nVertLevels","time"))
+
+    # Define the shadoe arrays of the data variables we're interested in
+    d_ssh = defVar(ds,"d_ssh",Float64,("nCells","time"))
+    d_layerThickness = defVar(ds,"d_layerThickness",Float64,("nCells","nVertLevels","time"))
+    d_normalVelocity = defVar(ds,"d_normalVelocity",Float64,("nEdges","nVertLevels","time"))
     
     # dump the variables into the dataset. 
     xtime[:] = Dates.value(Second(clock.currTime - clock.startTime))
@@ -94,6 +100,14 @@ function write_netcdf(Setup::ModelSetup,
     ssh[:,:] = Prog.ssh[:,end]
     layerThickness[:,:,:] = Prog.layerThickness[:,:,end] 
     normalVelocity[:,:,:] = Prog.normalVelocity[:,:,end]
+
+    d_ssh[:,:] = d_Prog.ssh[:,end]
+    d_layerThickness[:,:,:] = d_Prog.layerThickness[:,:,end] 
+    d_normalVelocity[:,:,:] = d_Prog.normalVelocity[:,:,end]
+
+    @show d_Prog.ssh
+    @show d_Prog.layerThickness
+    @show d_Prog.normalVelocity
     
     close(ds)
 end
