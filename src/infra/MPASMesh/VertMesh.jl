@@ -61,6 +61,7 @@ function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
                """
     end
 
+
     ActiveLevelsEdge = ActiveLevels{Edge}(mesh; backend=backend,
                                           nVertLevels=nVertLevels)
     ActiveLevelsVertex = ActiveLevels{Vertex}(mesh; backend=backend, 
