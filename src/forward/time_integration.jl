@@ -14,13 +14,13 @@ function advanceTimeLevels!(Prog::PrognosticVars)
         
         if size(field)[end] > 2 error("nTimeLevels must be <= 2") end
 
-        field = circshift(field, dims)
+        #field = circshift(field, dims)
 
         # some short hand for this would be nice
         if ndims(field) == 2
-            field[:,end] = field[:,end-1]
+            field[:,end-1] = field[:,end]
         else
-            field[:,:,end] = field[:,:,end-1]
+            field[:,:,end-1] = field[:,:,end]
         end
 
         setproperty!(Prog, field_name, field)
@@ -142,9 +142,9 @@ function ocn_timestep_ForwardEuler(Prog::PrognosticVars,
     # update the state variables by the tendencies 
     Prog.normalVelocity[:,:,end] .+= dt .* Tend.tendNormalVelocity
     Prog.layerThickness[:,:,end] .+= dt .* Tend.tendLayerThickness
-
-    Prog.ssh[:,end] = Prog.layerThickness[1,:,end]
     
+    Prog.ssh[:,end] = Prog.layerThickness[1,:,end]
+
     ssh_length = size(Prog.ssh)[1]
     for j = 1:ssh_length
         Prog.ssh[j,end] = Prog.ssh[j,end] - S.mesh.VertMesh.restingThicknessSum[j]
