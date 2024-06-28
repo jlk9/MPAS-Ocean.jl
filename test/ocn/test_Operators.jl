@@ -77,6 +77,8 @@ divError = ErrorMeasures(divNum, divAnn, HorzMesh, Cell)
 ### Curl Test
 ###
 
+# Edge normal component of vector value field defined at cell edges
+VecEdge = 𝐅ₑ(setup, PlanarTest)
 # Calculate the analytical divergence of field on edges (-> vertices)
 curlAnn = curl𝐅(setup, PlanarTest)
 # Numerical curl using KernelAbstractions operator
@@ -86,28 +88,27 @@ curlNum = KA.zeros(backend, Float64, (nVertLevels, nVertices))
 curlError = ErrorMeasures(curlNum, curlAnn, HorzMesh, Vertex)
 
 # test
-println(curlError.L_inf)
-println(curlError.L_two)
-
-#@test divError.L_inf ≈ 0.00124886886594453 atol=atol
-#@test divError.L_two ≈ 0.00124886886590979 atol=atol
-
+@test curlError.L_inf ≈ 0.16136566356969 atol=atol
+@test curlError.L_two ≈ 0.16134801689713 atol=atol
 
 ###
 ### Results Display
 ###
 
 arch = typeof(backend) <: KA.GPU ? "GPU" : "CPU" 
+@info """ (Operators on $arch) \n
+Gradient
+--------
+L∞ norm of error : $(gradError.L_inf)
+L₂ norm of error : $(gradError.L_two)
 
-println("\n" * "="^45)
-println("Kernel Abstraction Operator Tests on $arch")
-println("="^45 * "\n")
-println("Gradient")
-println("--------")
-println("L∞ norm of error : $(gradError.L_inf)")
-println("L₂ norm of error : $(gradError.L_two)")
-println("\nDivergence")
-println("----------")
-println("L∞ norm of error: $(divError.L_inf)")
-println("L₂ norm of error: $(divError.L_two)")
-println("\n" * "="^45 * "\n")
+Divergence
+----------
+L∞ norm of error: $(divError.L_inf)
+L₂ norm of error: $(divError.L_two)
+
+Curl
+----
+L∞ norm of error: $(curlError.L_inf)
+L₂ norm of error: $(curlError.L_two)
+"""

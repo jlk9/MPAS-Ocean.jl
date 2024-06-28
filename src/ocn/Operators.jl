@@ -117,32 +117,61 @@ function GradientOnEdge!(grad, hᵢ, Mesh::Mesh; backend=KA.CPU(), workgroupsize
     KA.synchronize(backend)
 end
 
-#=
 @kernel function CurlOnVertex(CurlVertex,
                               @Const(VecEdge),
                               @Const(edgesOnVertex),
-                              @Const(maxLevelVertexBot), 
                               @Const(dcEdge), 
                               @Const(edgeSignOnVertex), 
-                              @Const(areaTriangle))
+                              @Const(areaTriangle), 
+                              @Const(vertexDegree))
 
     # global indicies over nVertices and vertexDegree
-    iVertex, j = @index(Global, NTuple)
-    
-    @inbounds @private invAreaTriangle = 1.0 / areaTriangle[iVertex]
-    
-    @inbounds @private iEdge = edgesOnVertex[j, iVertex]
+    iVertex, k = @index(Global, NTuple)
+   
+    #CurlVertex[k, iVertex] = 0.0
 
-    for k in 1:maxLevelVertexBot[iVertex]
-        CurlVertex[k, iVertex] += dcEdge[iEdge] * VecEdge[k, iEdge] *
-                                  invAreaTriangle * edgeSignOnVertex[j, iVertex]
+    @inbounds @private invAreaTriangle = 1.0 / areaTriangle[iVertex]
+
+    for j in 1:vertexDegree
+        @inbounds @private iEdge = edgesOnVertex[j, iVertex]
+
+        @inbounds CurlVertex[k, iVertex] += dcEdge[iEdge] *
+                                            invAreaTriangle *
+                                            VecEdge[k, iEdge] *
+                                            edgeSignOnVertex[j, iVertex]
     end
 
     @synchronize()
 end
-=#
 
-@kernel function CurlOnVertex_P1(VecEdge, @Const(dcEdge), @Const(edgesOnVertex))
+function CurlOnVertex!(CurlVertex, VecEdge, Mesh::Mesh; backend = KA.CPU())
+
+    @unpack HorzMesh, VertMesh = Mesh    
+
+    @unpack nVertLevels, maxLevelVertex = VertMesh 
+    @unpack DualCells, Edges = HorzMesh
+
+    @unpack nEdges, dcEdge = Edges
+    @unpack nVertices, vertexDegree = DualCells
+    @unpack areaTriangle, edgeSignOnVertex, edgesOnVertex = DualCells
+
+    kernel! = CurlOnVertex(backend)
+    
+    kernel!(CurlVertex,
+            VecEdge,
+            edgesOnVertex,
+            dcEdge,
+            edgeSignOnVertex, 
+            areaTriangle,
+            vertexDegree,
+            ndrange=(nVertices, nVertLevels))
+           
+
+    KA.synchronize(backend)
+end
+
+#=
+@kernel function CurlOnVertex_P1(VecEdge, @Const(dcEdge))
 
     iEdge, k = @index(Global, NTuple)
     @inbounds VecEdge[k, iEdge] = VecEdge[k,iEdge] * dcEdge[iEdge]
@@ -153,23 +182,22 @@ end
                                 @Const(VecEdge), 
                                 @Const(edgesOnVertex),
                                 @Const(edgeSignOnVertex), 
-                                @Const(areaTriangle))
+                                @Const(areaTriangle), 
+                                @Const(vertexDegree))
     
     # i -> nVertices
-    # j -> vertexDegree
     # k -> nVertLevels
-    iVertex, j, k = @index(Global, NTuple)
+    iVertex, k = @index(Global, NTuple)
     
-    # can this be declared as local memory?
-    CurlVertex[k, iVertex] = 0.0
-
-    @private iEdge = edgesOnVertex[j, iVertex]
-    @private invAreaTriangle = 1.0 / areaTriangle[iVertex]
-
-    CurlVertex[k, iVertex] += VecEdge[k, iEdge] *
-                              edgeSignOnVertex[j, iVertex]
-
-    CurlVertex[k, iVertex] = CurlVertex[k, iVertex] * invAreaTriangle
+    @inbounds @private invAreaTriangle = 1.0 / areaTriangle[iVertex]
+    
+    for j in 1:vertexDegree
+        @inbounds @private iEdge = edgesOnVertex[j, iVertex]
+        
+        @inbounds CurlVertex[k, iVertex] += invAreaTriangle *
+                                            VecEdge[k, iEdge] *
+                                            edgeSignOnVertex[j, iVertex]
+    end
 
     @synchronize()
 end
@@ -178,39 +206,29 @@ function CurlOnVertex!(CurlVertex, VecEdge, Mesh::Mesh; backend = KA.CPU())
 
     @unpack HorzMesh, VertMesh = Mesh    
 
-    @unpack nVertLevels = VertMesh 
+    @unpack nVertLevels, maxLevelVertex = VertMesh 
     @unpack DualCells, Edges = HorzMesh
 
     @unpack nEdges, dcEdge = Edges
     @unpack nVertices, vertexDegree = DualCells
     @unpack areaTriangle, edgeSignOnVertex, edgesOnVertex = DualCells
 
-        
-    @show """ (Test) \n
-    nVertices = $nVertices 
-    VertexDegree = $vertexDegree
-    nVertLevels = $nVertLevels
-    """
-
     kernel1! = CurlOnVertex_P1(backend)
     kernel2! = CurlOnVertex_P2(backend)
-    
-    kernel1!(VecEdge,
-             dcEdge,
-             edgesOnVertex,
-             ndrange=(nEdges, nVertLevels), 
-             workgroupsize=64)
+
+    kernel1!(VecEdge, dcEdge, ndrange=(nEdges, nVertLevels), workgroupsize=64)
 
     kernel2!(CurlVertex,
              VecEdge,
              edgesOnVertex,
-             edgeSignOnVertex,
-             areaTriangle, 
-             ndrange = (nVertices, vertexDegree, nVertLevels),
-             workgroupsize=32)
-
+             edgeSignOnVertex, 
+             areaTriangle,
+             vertexDegree,
+             ndrange=(nVertices, nVertLevels))
+           
     KA.synchronize(backend)
 end
+=#
 
 function interpolateCell2Edge!(edgeValue, cellValue, Mesh::Mesh;
                                backend = KA.CPU(), workgroupsize=64)

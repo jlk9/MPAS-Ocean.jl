@@ -9,9 +9,7 @@ module MOKA
            Cell, Edge, Vertex
    
     # Operators
-    export GradientOnEdge,
-           DivergenceOnCell,
-           GradientOnEdge!,
+    export GradientOnEdge!,
            DivergenceOnCell!, 
            CurlOnVertex!
     
