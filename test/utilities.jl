@@ -41,6 +41,9 @@ struct TestSetup{FT, IT, AT}
     xᵉ::AT
     yᵉ::AT
 
+    xᵛ::AT
+    yᵛ::AT
+
     Lx::FT 
     Ly::FT
 
@@ -55,9 +58,10 @@ function TestSetup(Mesh::Mesh, ::Type{PlanarTest}; backend=KA.CPU())
     @unpack HorzMesh = Mesh
     
     @unpack nVertLevels = Mesh.VertMesh
-    @unpack PrimaryCells, Edges = HorzMesh
+    @unpack PrimaryCells, DualCells, Edges = HorzMesh
 
     @unpack xᶜ, yᶜ = PrimaryCells 
+    @unpack xᵛ, yᵛ = DualCells 
     @unpack xᵉ, yᵉ, angleEdge = Edges
 
     FT = eltype(xᶜ)
@@ -75,6 +79,8 @@ function TestSetup(Mesh::Mesh, ::Type{PlanarTest}; backend=KA.CPU())
                      Adapt.adapt(backend, yᶜ),
                      Adapt.adapt(backend, xᵉ),
                      Adapt.adapt(backend, yᵉ), 
+                     Adapt.adapt(backend, xᵛ),
+                     Adapt.adapt(backend, yᵛ), 
                      Lx, Ly,
                      Adapt.adapt(backend, EdgeNormalX),
                      Adapt.adapt(backend, EdgeNormalY), 
@@ -129,9 +135,22 @@ Analytical divergence of the 𝐅ₑ
 function div𝐅(test::TestSetup, ::Type{PlanarTest})
     @unpack xᶜ, yᶜ, Lx, Ly, nVertLevels = test 
 
-    result =  @. 2 * pi * (1. / Lx + 1. / Ly) *
+    result =  @. 2. * pi * (1. / Lx + 1. / Ly) *
                  cos(2.0 * pi * xᶜ / Lx) * cos(2.0 * pi * yᶜ / Ly)
     
+    # return nVertLevels time tiled version of the array
+    return repeat(result', outer=[nVertLevels, 1])
+end
+
+"""
+Analytical curl of vector field 𝐅ₑ 
+"""
+function curl𝐅(test::TestSetup, ::Type{PlanarTest})
+    @unpack xᵛ, yᵛ, Lx, Ly, nVertLevels = test 
+
+    result = @. 2. * pi * (-1. / Lx + 1. / Ly) *
+                sin(2. * pi * xᵛ / Lx) * sin(2.0 * pi * yᵛ / Ly)
+
     # return nVertLevels time tiled version of the array
     return repeat(result', outer=[nVertLevels, 1])
 end

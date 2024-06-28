@@ -23,13 +23,14 @@ backend = KA.CPU()
 # Read in the purely horizontal doubly periodic testing mesh
 HorzMesh = ReadHorzMesh(mesh_fn; backend=backend)
 # Create a dummy vertical mesh from the horizontal mesh
-VertMesh = VerticalMesh(HorzMesh; nVertLevels=1, backend=backend)
+VertMesh = VerticalMesh(HorzMesh; nVertLevels=10, backend=backend)
 # Create a the full Mesh strucutre 
 MPASMesh = Mesh(HorzMesh, VertMesh)
 
 # get some dimension information
 nEdges = HorzMesh.Edges.nEdges
 nCells = HorzMesh.PrimaryCells.nCells
+nVertices = HorzMesh.DualCells.nVertices
 nVertLevels = VertMesh.nVertLevels
 
 setup = TestSetup(MPASMesh, PlanarTest; backend=backend)
@@ -71,6 +72,26 @@ divError = ErrorMeasures(divNum, divAnn, HorzMesh, Cell)
 # test
 @test divError.L_inf ≈ 0.00124886886594453 atol=atol
 @test divError.L_two ≈ 0.00124886886590979 atol=atol
+
+###
+### Curl Test
+###
+
+# Calculate the analytical divergence of field on edges (-> vertices)
+curlAnn = curl𝐅(setup, PlanarTest)
+# Numerical curl using KernelAbstractions operator
+curlNum = KA.zeros(backend, Float64, (nVertLevels, nVertices))
+@allowscalar CurlOnVertex!(curlNum, VecEdge, MPASMesh; backend=backend)
+
+curlError = ErrorMeasures(curlNum, curlAnn, HorzMesh, Vertex)
+
+# test
+println(curlError.L_inf)
+println(curlError.L_two)
+
+#@test divError.L_inf ≈ 0.00124886886594453 atol=atol
+#@test divError.L_two ≈ 0.00124886886590979 atol=atol
+
 
 ###
 ### Results Display
