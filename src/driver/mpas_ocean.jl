@@ -72,7 +72,7 @@ function ocn_run(config_fp)
     #d_Prog.layerThickness[1,1,1] = 1.0
 
     #old_Prog = deepcopy(Prog)
-    #=
+    
     d_sum = autodiff(Enzyme.Reverse,
              ocn_run_loop,
              Duplicated(Prog, d_Prog),
@@ -84,14 +84,14 @@ function ocn_run(config_fp)
              Duplicated(simulationAlarm, d_simulationAlarm),
              Duplicated(outputAlarm, d_outputAlarm),
              )
-    =#
+    #=
     autodiff(Enzyme.Reverse,
              ocn_timestep_ForwardEuler,
              Duplicated(Prog, d_Prog),
              Duplicated(Diag, d_Diag),
              Duplicated(Tend, d_Tend),
              Duplicated(Setup, d_Setup))
-    
+    =#
     #ocn_timestep_ForwardEuler(Prog, Diag, Tend, Setup; backend=backend)
     #=
     @show Prog.ssh - old_Prog.ssh
