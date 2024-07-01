@@ -121,31 +121,43 @@ function ocn_timestep(Prog::PrognosticVars,
                       S::ModelSetup,
                       ::Type{ForwardEuler};
                       backend = KA.CPU())
+
+    Mesh = S.mesh
+    Clock = S.timeManager
+    Config = S.config
     
     # advance the timelevels within the state strcut 
     advanceTimeLevels!(Prog)
     
     # convert the timestep to seconds 
-    dt = convert(Float64, Dates.value(Second(S.timeManager.timeStep)))
+    dt = convert(Float64, Dates.value(Second(Clock.timeStep)))
+
+    # unpack the state variable arrays 
+    @unpack ssh, normalVelocity, layerThickness = Prog
 
     # compute the diagnostics
-    diagnostic_compute!(S.mesh, Diag, Prog; backend = backend)
+    diagnostic_compute!(Mesh, Diag, Prog; backend = backend)
 
     # compute normalVelocity tenedency 
-    computeNormalVelocityTendency!(Tend, Prog, Diag, S.mesh, S.config;
+    computeNormalVelocityTendency!(Tend, Prog, Diag, Mesh, Config;
                                    backend = backend)
     # compute layerThickness tendency 
-    computeLayerThicknessTendency!(Tend, Prog, Diag, S.mesh, S.config;
+    computeLayerThicknessTendency!(Tend, Prog, Diag, Mesh, Config;
                                    backend = backend)
+
+    # unpack the tendency variable arrays 
+    @unpack tendNormalVelocity, tendLayerThickness = Tend 
     
     # update the state variables by the tendencies 
-    Prog.normalVelocity[:,:,end] .+= dt .* Tend.tendNormalVelocity
-    Prog.layerThickness[:,:,end] .+= dt .* Tend.tendLayerThickness
+    normalVelocity[:,:,end] .+= dt .* tendNormalVelocity
+    layerThickness[:,:,end] .+= dt .* tendLayerThickness
     
-    Prog.ssh[:,end] = Prog.layerThickness[1,:,end]
+    ssh[:,end] = Prog.layerThickness[1,:,end]
 
     ssh_length = size(Prog.ssh)[1]
     for j = 1:ssh_length
-        Prog.ssh[j,end] = Prog.ssh[j,end] - S.mesh.VertMesh.restingThicknessSum[j]
+        ssh[j,end] = ssh[j,end] - Mesh.VertMesh.restingThicknessSum[j]
     end
+
+    @pack! Prog = ssh, normalVelocity, layerThickness
 end 
