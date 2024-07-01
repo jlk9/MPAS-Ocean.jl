@@ -105,10 +105,11 @@ function write_netcdf(Setup::ModelSetup,
     d_layerThickness[:,:,:] = d_Prog.layerThickness[:,:,end] 
     d_normalVelocity[:,:,:] = d_Prog.normalVelocity[:,:,end]
 
+    #=
     @show d_Prog.ssh
     @show d_Prog.layerThickness
     @show d_Prog.normalVelocity
-    
+    =#
     close(ds)
 end
 

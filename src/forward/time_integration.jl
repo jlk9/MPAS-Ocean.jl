@@ -14,8 +14,6 @@ function advanceTimeLevels!(Prog::PrognosticVars)
         
         if size(field)[end] > 2 error("nTimeLevels must be <= 2") end
 
-        #field = circshift(field, dims)
-
         # some short hand for this would be nice
         if ndims(field) == 2
             field[:,end-1] = field[:,end]
