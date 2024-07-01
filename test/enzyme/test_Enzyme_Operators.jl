@@ -20,8 +20,8 @@ mesh_fn  = "MokaMesh.nc"
 
 Downloads.download(mesh_url, mesh_fn)
 
-backend = KA.CPU()
-#backend = CUDABackend();
+#backend = KA.CPU()
+backend = CUDABackend();
 
 # Read in the purely horizontal doubly periodic testing mesh
 HorzMesh = ReadHorzMesh(mesh_fn; backend=backend)
@@ -41,16 +41,8 @@ nVertLevels = VertMesh.nVertLevels
 ###
 
 # As a clean / easy to read test, let's create an outer function that measures the squared norm of the gradient computed by kernel:
-function gradient_normSq(grad, hᵢ, mesh::Mesh; backend=KA.CPU())
+function gradient_test(grad, hᵢ, mesh::Mesh; backend=CUDABackend())
     GradientOnEdge!(grad, hᵢ, mesh::Mesh; backend=backend)
-
-    normSq = 0.0
-    N = size(grad)
-    for i = 1:N[2]
-        normSq += grad[i]^2
-    end
-
-    return normSq
 end
 
 # Let's recreate all the variables:
@@ -61,15 +53,17 @@ d_gradNum  = KA.zeros(backend, Float64, (nVertLevels, nEdges))
 d_Scalar   = KA.zeros(backend, eltype(setup.xᶜ), (nVertLevels, nCells))
 d_MPASMesh = Enzyme.make_zero(MPASMesh)
 
+@allowscalar d_gradNum[1] = 1.0
+
 d_normSq = autodiff(Enzyme.Reverse,
-                    gradient_normSq,
+                    gradient_test,
                     Duplicated(gradNum, d_gradNum),
                     Duplicated(Scalar, d_Scalar),
                     Duplicated(MPASMesh, d_MPASMesh))
 
-#@show d_gradNum
-#@show d_Scalar
+@show d_Scalar
 
+#=
 # For comparison, let's compute the derivative by hand for a given scalar entry:
 gradNum = KA.zeros(backend, Float64, (nVertLevels, nEdges))
 Scalar  = h(setup, PlanarTest)
@@ -93,6 +87,7 @@ For edge global index $k
 Enzyme computed $dnorm_dscalar
 Finite differences computed $dnorm_dscalar_fd
 """
+
 ###
 ### Now let's test divergence:
 ###
@@ -145,3 +140,4 @@ For cell global index $k
 Enzyme computed $dnorm_dvecedge
 Finite differences computed $dnorm_dvecedge_fd
 """
+=#
