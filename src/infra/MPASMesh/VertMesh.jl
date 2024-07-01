@@ -1,12 +1,8 @@
 import Adapt
 
-mutable struct VerticalCoordinate{CC2DA, VA}
-    restingThickness::CC2DA
-    movementWeights::VA
-end
-
 mutable struct VerticalMesh{I, IV, FV, AL}
     nVertLevels::I
+
     minLevelCell::IV
     maxLevelCell::IV
     maxLevelEdge::AL
@@ -18,39 +14,58 @@ mutable struct VerticalMesh{I, IV, FV, AL}
 end
 
 mutable struct ActiveLevels{IV}
-    Top::IV
+    # Index to the last {edge|vertex} in a column with active ocean cells 
+    # on *all* sides of it
+    Top::IV 
+    # Index to the last {edge|vertex} in a column with at least one active
+    # ocean cell around it
     Bot::IV
 end
 
-function ActiveLevels(dim, eltype, backend)
-    Top = KA.ones(backend, eltype, dim)
-    Bot = KA.ones(backend, eltype, dim)
+"""
+ActiveLevels constructor for a nVertLevel stacked *periodic* meshes
+"""
+function ActiveLevels(dim, eltype, backend, nVertLevels)
+    Top = KA.ones(backend, eltype, dim) .* eltype(nVertLevels)
+    Bot = KA.ones(backend, eltype, dim) .* eltype(nVertLevels)
 
     ActiveLevels(Top, Bot)
 end
 
-# additional constructor needed for adapt methods
-#ActiveLevels(Top::IV, Bot::IV) where {IV} = ActiveLevels{IV}(Top, Bot)
-
-function ActiveLevels{Edge}(mesh; backend=KA.CPU())
-    ActiveLevels(mesh.Edges.nEdges, Int32, backend)
+function ActiveLevels{Edge}(mesh; backend=KA.CPU(), nVertLevels=1)
+    ActiveLevels(mesh.Edges.nEdges, Int32, backend, nVertLevels)
 end
 
-function ActiveLevels{Vertex}(mesh; backend=KA.CPU())
-    ActiveLevels(mesh.DualCells.nVertices, Int32, backend)
+function ActiveLevels{Vertex}(mesh; backend=KA.CPU(), nVertLevels=1)
+    ActiveLevels(mesh.DualCells.nVertices, Int32, backend, nVertLevels)
 end
 
 function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
     
     ds = NCDataset(mesh_fp, "r")
+    
+    if uppercase(ds.attrib["is_periodic"]) != "YES"
+        error("Support for non-periodic meshes is not yet implemented")
+    end
 
     nVertLevels = ds.dim["nVertLevels"]
     minLevelCell = ds["minLevelCell"][:]
     maxLevelCell = ds["maxLevelCell"][:]
     restingThickness = ds["restingThickness"][:,:,1]
 
-    ActiveLevelsEdge = ActiveLevels{Edge}(mesh; backend=backend)
-    ActiveLevelsVertex = ActiveLevels{Vertex}(mesh; backend=backend)
+    # check that the vertical mesh is stacked 
+    if !all(maxLevelCell .== nVertLevels)
+        @error """ (Vertical Mesh Initializaton)\n
+               Vertical Mesh is not stacked. Must implement vertical masking
+               before this mesh can be used
+               """
+    end
+
+
+    ActiveLevelsEdge = ActiveLevels{Edge}(mesh; backend=backend,
+                                          nVertLevels=nVertLevels)
+    ActiveLevelsVertex = ActiveLevels{Vertex}(mesh; backend=backend, 
+                                              nVertLevels=nVertLevels)
 
     VerticalMesh(nVertLevels,
                  Adapt.adapt(backend, minLevelCell),
@@ -58,6 +73,39 @@ function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
                  ActiveLevelsEdge,
                  ActiveLevelsVertex, 
                  Adapt.adapt(backend, restingThickness))
+end
+
+"""
+Constructor for an (n) layer stacked vertical mesh. Only valid when paired 
+with a *periodic* horizontal mesh.
+
+This function is handy for unit test that read in purely horizontal meshes. 
+
+NOTE: Not to be used for real simualtions, only for unit testing. 
+"""
+function VerticalMesh(mesh; nVertLevels=1, backend=KA.CPU())
+
+    nCells = mesh.PrimaryCells.nCells
+
+    minLevelCell = KA.ones(backend, Int32, nCells)
+    maxLevelCell = KA.ones(backend, Int32, nCells) .* Int32(nVertLevels)
+    # unit thickness water column, irrespective of how many vertical levels
+    restingThickness = KA.ones(backend, Float64, nCells)
+
+    ActiveLevelsEdge = ActiveLevels{Edge}(mesh; backend=backend,
+                                          nVertLevels=nVertLevels)
+
+    ActiveLevelsVertex = ActiveLevels{Vertex}(mesh; backend=backend, 
+                                              nVertLevels=nVertLevels)
+
+    # All array have been allocated on the requested backend,
+    # so no need to call methods from Adapt
+    VerticalMesh(nVertLevels,
+                 minLevelCell,
+                 maxLevelCell,
+                 ActiveLevelsEdge,
+                 ActiveLevelsVertex, 
+                 restingThickness)
 end
 
 function Adapt.adapt_structure(backend, x::ActiveLevels)
