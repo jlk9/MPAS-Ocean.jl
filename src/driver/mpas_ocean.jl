@@ -160,10 +160,10 @@ function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAl
     
         global i += 1
     
-        ocn_timestep_ForwardEuler(Prog, Diag, Tend, Setup; backend=backend)
+        ocn_timestep(Prog, Diag, Tend, Setup, ForwardEuler; backend=backend)
         
         if isRinging(outputAlarm)
-            # should be doing i/o in here, using a i/o struct
+            # should be doing i/o in here, using a i/o struct... unless we want to apply AD
             reset!(outputAlarm)
         end
     end
