@@ -46,6 +46,7 @@ function ocn_run(config_fp)
     println(clock.currTime)
 end
 
+# Runs forward model with AD, and computes FD derivative approximations for comparison
 function ocn_run_with_ad(config_fp)
 
     #
@@ -146,25 +147,6 @@ function ocn_run_with_ad(config_fp)
     println(clock.currTime)
 end
 
-# Helper function for setting the clock, simulationAlarm, and outputAlarm
-function ocn_init_alarms(Setup)
-    mesh = Setup.mesh
-    
-    # this is hardcoded for now, but should really be set accordingly in the 
-    # yaml file
-    #dt = floor(3.0 * mean(mesh.dcEdge) / 1e3)
-    dcEdge = mesh.HorzMesh.Edges.dcEdge
-    dt = floor(2 * (mean(dcEdge) / 1e3) * mean(dcEdge) / 200e3) 
-    changeTimeStep!(Setup.timeManager, Second(dt))
-    
-    clock = Setup.timeManager
-    
-    simulationAlarm = clock.alarms["simulation_end"]
-    outputAlarm = clock.alarms["outputAlarm"]
-
-    return clock, simulationAlarm, outputAlarm
-end
-
 # Helper function that runs the model "loop" without instantiating new memory or performing I/O.
 # This is what we call AD on. At the end we also sum up the squared SSH for testing purposes.
 function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=KA.CPU())
@@ -195,7 +177,11 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     if isfile(ARGS[1])
-        ocn_run_with_ad(ARGS[1])
+        if (length(ARGS) > 1 && ARGS[2] == "--with_ad")
+            ocn_run_with_ad(ARGS[1])
+        else
+            ocn_run(ARGS[1])
+        end
     else 
         error("yaml config file invalid")
     end
