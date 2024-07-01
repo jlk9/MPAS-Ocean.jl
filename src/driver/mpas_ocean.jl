@@ -70,30 +70,52 @@ function ocn_run(config_fp)
              )
     
     # Let's try a FD comparison:
-    ϵ = 1e-9
+    ϵ_range = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
+
+    k = 1398
     
-    SetupP, DiagP, TendP, ProgP            = ocn_init(config_fp, backend = backend)
-    clockP, simulationAlarmP, outputAlarmP = ocn_init_alarms(SetupP)
+    for ϵ in ϵ_range
+        SetupP, DiagP, TendP, ProgP            = ocn_init(config_fp, backend = backend)
+        clockP, simulationAlarmP, outputAlarmP = ocn_init_alarms(SetupP)
 
-    SetupM, DiagM, TendM, ProgM            = ocn_init(config_fp, backend = backend)
-    clockM, simulationAlarmM, outputAlarmM = ocn_init_alarms(SetupM)
+        SetupM, DiagM, TendM, ProgM            = ocn_init(config_fp, backend = backend)
+        clockM, simulationAlarmM, outputAlarmM = ocn_init_alarms(SetupM)
 
-    ProgP.layerThickness[1,1,end] = ProgP.layerThickness[1,1,end] + abs(ProgP.layerThickness[1,1,end]) * ϵ
-    ProgM.layerThickness[1,1,end] = ProgM.layerThickness[1,1,end] - abs(ProgM.layerThickness[1,1,end]) * ϵ
-    
-    dist = ProgP.layerThickness[1,1,end] - ProgM.layerThickness[1,1,end]
+        ProgP.layerThickness[1,k,end] = ProgP.layerThickness[1,k,end] + abs(ProgP.layerThickness[1,k,end]) * ϵ
+        ProgM.layerThickness[1,k,end] = ProgM.layerThickness[1,k,end] - abs(ProgM.layerThickness[1,k,end]) * ϵ
+        
+        dist = ProgP.layerThickness[1,k,end] - ProgM.layerThickness[1,k,end]
 
-    sumP = ocn_run_loop(ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
-    sumM = ocn_run_loop(ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
+        sumP = ocn_run_loop(ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
+        sumM = ocn_run_loop(ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
 
-    d_firstlayer_fd = (sumP - sumM) / dist
-    
-    @show sumP
-    @show sumM
-    @show dist
+        d_firstlayer_fd = (sumP - sumM) / dist
 
-    @show d_firstlayer_fd
-    @show d_Prog.layerThickness[1,1,end]
+        @show ϵ, d_firstlayer_fd
+    end
+    @show d_Prog.layerThickness[1,k,end]
+
+    # For normal velocity:
+    for ϵ in ϵ_range
+        SetupP, DiagP, TendP, ProgP            = ocn_init(config_fp, backend = backend)
+        clockP, simulationAlarmP, outputAlarmP = ocn_init_alarms(SetupP)
+
+        SetupM, DiagM, TendM, ProgM            = ocn_init(config_fp, backend = backend)
+        clockM, simulationAlarmM, outputAlarmM = ocn_init_alarms(SetupM)
+
+        ProgP.normalVelocity[1,k,end] = ProgP.normalVelocity[1,k,end] + abs(ProgP.normalVelocity[1,k,end]) * ϵ
+        ProgM.normalVelocity[1,k,end] = ProgM.normalVelocity[1,k,end] - abs(ProgM.normalVelocity[1,k,end]) * ϵ
+        
+        dist = ProgP.normalVelocity[1,k,end] - ProgM.normalVelocity[1,k,end]
+
+        sumP = ocn_run_loop(ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
+        sumM = ocn_run_loop(ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
+
+        d_firstvelocity_fd = (sumP - sumM) / dist
+
+        @show ϵ, d_firstvelocity_fd
+    end
+    @show d_Prog.normalVelocity[1,k,end]
 
     #ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
 
