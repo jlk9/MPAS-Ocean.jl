@@ -30,6 +30,35 @@ function ocn_run(config_fp)
     Setup, Diag, Tend, Prog             = ocn_init(config_fp, backend = backend)
     clock, simulationAlarm, outputAlarm = ocn_init_alarms(Setup)
 
+    ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
+
+    #
+    # Writing to outputs
+    #
+    
+    # Only suport i/o at the end of the simulation for now 
+    write_netcdf(Setup, Diag, Prog)
+    
+    backend = get_backend(Tend.tendNormalVelocity)
+    arch = typeof(backend) <: KA.GPU ? "GPU" : "CPU"
+
+    println("Moka.jl ran on $arch")
+    println(clock.currTime)
+end
+
+function ocn_run_with_ad(config_fp)
+
+    #
+    # Setup for model
+    #
+    
+    backend = KA.CPU()
+    #backend = CUDABackend()
+
+    # Initialize the Model  
+    Setup, Diag, Tend, Prog             = ocn_init(config_fp, backend = backend)
+    clock, simulationAlarm, outputAlarm = ocn_init_alarms(Setup)
+
     #
     # Actual Model Run with AD
     #
@@ -42,20 +71,6 @@ function ocn_run(config_fp)
     d_clock = Enzyme.make_zero(clock)
     d_simulationAlarm = Enzyme.make_zero(simulationAlarm)
     d_outputAlarm = Enzyme.make_zero(outputAlarm)
-
-    #@show d_Setup.mesh.VertMesh.restingThicknessSum
-
-    # Let's see how to increase the variation in ocean ssh:
-    #=
-    for j = 1:size(Prog.ssh)[end]
-        if Prog.ssh[j] > 0
-            d_Prog.ssh[j] = 1.0
-        elseif Prog.ssh[j] < 0
-            d_Prog.ssh[j] = -1.0
-        end
-    end
-    =#
-    #d_Prog.layerThickness[1,1,1] = 1.0
 
     d_sum = autodiff(Enzyme.Reverse,
              ocn_run_loop,
@@ -70,7 +85,7 @@ function ocn_run(config_fp)
              )
     
     # Let's try a FD comparison:
-    ϵ_range = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
+    ϵ_range = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
 
     k = 1398
     
@@ -117,8 +132,6 @@ function ocn_run(config_fp)
     end
     @show d_Prog.normalVelocity[1,k,end]
 
-    #ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
-
     #
     # Writing to outputs
     #
@@ -133,6 +146,7 @@ function ocn_run(config_fp)
     println(clock.currTime)
 end
 
+# Helper function for setting the clock, simulationAlarm, and outputAlarm
 function ocn_init_alarms(Setup)
     mesh = Setup.mesh
     
@@ -151,6 +165,8 @@ function ocn_init_alarms(Setup)
     return clock, simulationAlarm, outputAlarm
 end
 
+# Helper function that runs the model "loop" without instantiating new memory or performing I/O.
+# This is what we call AD on. At the end we also sum up the squared SSH for testing purposes.
 function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=KA.CPU())
     global i = 0
     # Run the model 
@@ -179,7 +195,7 @@ end
 
 if abspath(PROGRAM_FILE) == @__FILE__
     if isfile(ARGS[1])
-        ocn_run(ARGS[1])
+        ocn_run_with_ad(ARGS[1])
     else 
         error("yaml config file invalid")
     end
