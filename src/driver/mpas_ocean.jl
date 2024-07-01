@@ -27,22 +27,8 @@ function ocn_run(config_fp)
     #backend = CUDABackend()
 
     # Initialize the Model  
-    Setup, Diag, Tend, Prog = ocn_init(config_fp, backend = backend)
-    
-    mesh = Setup.mesh 
-    config = Setup.config
-    
-    # this is hardcoded for now, but should really be set accordingly in the 
-    # yaml file
-    #dt = floor(3.0 * mean(mesh.dcEdge) / 1e3)
-    dcEdge = mesh.HorzMesh.Edges.dcEdge
-    dt = floor(2 * (mean(dcEdge) / 1e3) * mean(dcEdge) / 200e3) 
-    changeTimeStep!(Setup.timeManager, Second(dt))
-    
-    clock = Setup.timeManager
-    
-    simulationAlarm = clock.alarms["simulation_end"]
-    outputAlarm = clock.alarms["outputAlarm"]
+    Setup, Diag, Tend, Prog             = ocn_init(config_fp, backend = backend)
+    clock, simulationAlarm, outputAlarm = ocn_init_alarms(Setup)
 
     #
     # Actual Model Run with AD
@@ -71,8 +57,6 @@ function ocn_run(config_fp)
     =#
     #d_Prog.layerThickness[1,1,1] = 1.0
 
-    #old_Prog = deepcopy(Prog)
-    
     d_sum = autodiff(Enzyme.Reverse,
              ocn_run_loop,
              Duplicated(Prog, d_Prog),
@@ -84,20 +68,32 @@ function ocn_run(config_fp)
              Duplicated(simulationAlarm, d_simulationAlarm),
              Duplicated(outputAlarm, d_outputAlarm),
              )
-    #=
-    autodiff(Enzyme.Reverse,
-             ocn_timestep_ForwardEuler,
-             Duplicated(Prog, d_Prog),
-             Duplicated(Diag, d_Diag),
-             Duplicated(Tend, d_Tend),
-             Duplicated(Setup, d_Setup))
-    =#
-    #ocn_timestep_ForwardEuler(Prog, Diag, Tend, Setup; backend=backend)
-    #=
-    @show Prog.ssh - old_Prog.ssh
-    @show Prog.layerThickness - old_Prog.layerThickness
-    @show Prog.normalVelocity - old_Prog.normalVelocity
-    =#
+    
+    # Let's try a FD comparison:
+    ϵ = 1e-9
+    
+    SetupP, DiagP, TendP, ProgP            = ocn_init(config_fp, backend = backend)
+    clockP, simulationAlarmP, outputAlarmP = ocn_init_alarms(SetupP)
+
+    SetupM, DiagM, TendM, ProgM            = ocn_init(config_fp, backend = backend)
+    clockM, simulationAlarmM, outputAlarmM = ocn_init_alarms(SetupM)
+
+    ProgP.layerThickness[1,1,end] = ProgP.layerThickness[1,1,end] + abs(ProgP.layerThickness[1,1,end]) * ϵ
+    ProgM.layerThickness[1,1,end] = ProgM.layerThickness[1,1,end] - abs(ProgM.layerThickness[1,1,end]) * ϵ
+    
+    dist = ProgP.layerThickness[1,1,end] - ProgM.layerThickness[1,1,end]
+
+    sumP = ocn_run_loop(ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
+    sumM = ocn_run_loop(ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
+
+    d_firstlayer_fd = (sumP - sumM) / dist
+    
+    @show sumP
+    @show sumM
+    @show dist
+
+    @show d_firstlayer_fd
+    @show d_Prog.layerThickness[1,1,end]
 
     #ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
 
@@ -109,21 +105,38 @@ function ocn_run(config_fp)
     write_netcdf(Setup, Diag, Prog, d_Prog)
     
     backend = get_backend(Tend.tendNormalVelocity)
-    arch = typeof(backend) <: KA.GPU ? "GPU" : "CPU" 
+    arch = typeof(backend) <: KA.GPU ? "GPU" : "CPU"
 
     println("Moka.jl ran on $arch")
     println(clock.currTime)
 end
 
+function ocn_init_alarms(Setup)
+    mesh = Setup.mesh
+    
+    # this is hardcoded for now, but should really be set accordingly in the 
+    # yaml file
+    #dt = floor(3.0 * mean(mesh.dcEdge) / 1e3)
+    dcEdge = mesh.HorzMesh.Edges.dcEdge
+    dt = floor(2 * (mean(dcEdge) / 1e3) * mean(dcEdge) / 200e3) 
+    changeTimeStep!(Setup.timeManager, Second(dt))
+    
+    clock = Setup.timeManager
+    
+    simulationAlarm = clock.alarms["simulation_end"]
+    outputAlarm = clock.alarms["outputAlarm"]
+
+    return clock, simulationAlarm, outputAlarm
+end
+
 function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=KA.CPU())
-    #global i = 0
+    global i = 0
     # Run the model 
-    #while !isRinging(simulationAlarm)
-    for i = 1:90
+    while !isRinging(simulationAlarm)
     
         advance!(clock)
     
-        #global i += 1
+        global i += 1
     
         ocn_timestep_ForwardEuler(Prog, Diag, Tend, Setup; backend=backend)
         
@@ -138,8 +151,6 @@ function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAl
     for j = 1:ssh_length
         sum = sum + Prog.ssh[j]^2
     end
-
-    @show sum
 
     return sum
 end
