@@ -1,6 +1,6 @@
 module MOKA
     
-    export ocn_init, isRinging, advance!, ocn_timestep, ocn_timestep_ForwardEuler, changeTimeStep!, reset!
+    export ocn_init, isRinging, advance!, ocn_timestep, changeTimeStep!, reset!
     export RungeKutta4, ForwardEuler 
     export write_netcdf
     

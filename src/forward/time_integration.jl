@@ -115,10 +115,11 @@ function ocn_timestep(Prog::PrognosticVars,
     diagnostic_compute!(Mesh, Diag, Prog)
 end 
 
-function ocn_timestep_ForwardEuler(Prog::PrognosticVars, 
+function ocn_timestep(Prog::PrognosticVars, 
                       Diag::DiagnosticVars,
                       Tend::TendencyVars, 
-                      S::ModelSetup;
+                      S::ModelSetup,
+                      ::Type{ForwardEuler};
                       backend = KA.CPU())
     
     # advance the timelevels within the state strcut 
@@ -147,12 +148,4 @@ function ocn_timestep_ForwardEuler(Prog::PrognosticVars,
     for j = 1:ssh_length
         Prog.ssh[j,end] = Prog.ssh[j,end] - S.mesh.VertMesh.restingThicknessSum[j]
     end
-
-    sum = 0.0
-    ssh_length = size(Prog.ssh)[1]
-    for j = 1:ssh_length
-        sum = sum + Prog.ssh[j,end]^2
-    end
-
-    return sum
 end 
