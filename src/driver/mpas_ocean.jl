@@ -88,7 +88,10 @@ function ocn_run_with_ad(config_fp)
     # Let's try a FD comparison:
     ϵ_range = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
 
-    k = 1398
+    k = 741
+
+    println("For cell number")
+    @show k
     
     for ϵ in ϵ_range
         SetupP, DiagP, TendP, ProgP            = ocn_init(config_fp, backend = backend)
@@ -169,7 +172,7 @@ function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAl
     sum = 0.0
     ssh_length = size(Prog.ssh)[1]
     for j = 1:ssh_length
-        sum = sum + Prog.ssh[j]^2
+        sum = sum + Prog.ssh[j,2]^2
     end
 
     return sum
