@@ -96,7 +96,8 @@ function VerticalMesh(mesh; nVertLevels=1, backend=KA.CPU())
     minLevelCell = KA.ones(backend, Int32, nCells)
     maxLevelCell = KA.ones(backend, Int32, nCells) .* Int32(nVertLevels)
     # unit thickness water column, irrespective of how many vertical levels
-    restingThickness = KA.ones(backend, Float64, nCells)
+    restingThickness    = KA.ones(backend, Float64, nCells)
+    restingThicknessSum = KA.ones(backend, Float64, nCells) # MIGHT NEED TO CHANGE THIS
 
     ActiveLevelsEdge = ActiveLevels{Edge}(mesh; backend=backend,
                                           nVertLevels=nVertLevels)
@@ -111,7 +112,8 @@ function VerticalMesh(mesh; nVertLevels=1, backend=KA.CPU())
                  maxLevelCell,
                  ActiveLevelsEdge,
                  ActiveLevelsVertex, 
-                 restingThickness)
+                 restingThickness,
+                 restingThicknessSum)
 end
 
 function Adapt.adapt_structure(backend, x::ActiveLevels)
