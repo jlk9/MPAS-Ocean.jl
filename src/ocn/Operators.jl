@@ -9,51 +9,19 @@ using KernelAbstractions
                                        n_{\rm e,i} F_{\rm e} l_{\rm e}
 ```
 """
-@kernel function DivergenceOnCell(DivCell, 
-                                  @Const(VecEdge),
-                                  @Const(nEdgesOnCell), 
-                                  @Const(edgesOnCell),
-                                  @Const(maxLevelEdgeTop),
-                                  @Const(edgeSignOnCell),
-                                  @Const(dvEdge),
-                                  @Const(areaCell))
-
-    iCell = @index(Global, Linear)
-    
-    # get inverse cell area
-    invArea = 1. / areaCell[iCell]
-
-    # create tmp varibale to store div reduction
-    #div = @localmem eltype(DivCell) (1) 
-    
-    # loop over number of edges in primary cell
-    for i in 1:nEdgesOnCell[iCell]
-        iEdge = edgesOnCell[i,iCell]
-        # loop over the number of (active) vertical layers
-        for k in 1:maxLevelEdgeTop[iEdge]
-            # ...
-            DivCell[k,iCell] -= VecEdge[k,iEdge] * dvEdge[iEdge] *
-                                edgeSignOnCell[i,iCell] * invArea
-        end
-    end
-    
-    #DivCell[k,iCell] = div * invArea
-
-end
-
-@kernel function DivergenceOnCellModified1(VecEdge, @Const(dvEdge))
+@kernel function DivergenceOnCell_P1(VecEdge, @Const(dvEdge))
 
     iEdge, k = @index(Global, NTuple)
     @inbounds VecEdge[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
     @synchronize()
 end
 
-@kernel function DivergenceOnCellModified2(DivCell, 
-                                            @Const(VecEdge),
-                                            @Const(nEdgesOnCell), 
-                                            @Const(edgesOnCell),
-                                            @Const(edgeSignOnCell),
-                                            @Const(areaCell)) #::Val{n}, where {n}
+@kernel function DivergenceOnCell_P2(DivCell, 
+                                     @Const(VecEdge),
+                                     @Const(nEdgesOnCell), 
+                                     @Const(edgesOnCell),
+                                     @Const(edgeSignOnCell),
+                                     @Const(areaCell)) #::Val{n}, where {n}
 
     iCell, k = @index(Global, NTuple)
 
@@ -79,22 +47,26 @@ function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=KA.CPU())
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack PrimaryCells, DualCells, Edges = HorzMesh
     
-    @unpack dvEdge = Edges
-    @unpack maxLevelEdge = VertMesh 
+    @unpack nVertLevels = VertMesh 
+    @unpack dvEdge, nEdges = Edges
     @unpack nCells, nEdgesOnCell = PrimaryCells
     @unpack edgesOnCell, edgeSignOnCell, areaCell = PrimaryCells
     
-    kernel! = DivergenceOnCell(backend)
+    kernel1! = DivergenceOnCell_P1(backend)
+    kernel2! = DivergenceOnCell_P2(backend)
 
-    kernel!(DivCell, 
-            VecEdge,
-            nEdgesOnCell, 
-            edgesOnCell,
-            maxLevelEdge.Top,
-            edgeSignOnCell,
-            dvEdge,
-            areaCell, 
-            ndrange = nCells)
+    # TODO: Add workgroupsize(s) as kwarg. As named tuple:
+    #       DivergenceOnCell!(...; workgroupsizes=(P1 = 64, P2 = 32))
+    kernel1!(VecEdge, dvEdge, workgroupsize=64, ndrange=(nEdges, nVertLevels))
+
+    kernel2!(DivCell,
+             VecEdge,
+             nEdgesOnCell,
+             edgesOnCell,
+             edgeSignOnCell,
+             areaCell,
+             workgroupsize=32,
+             ndrange=(nCells, nVertLevels))
 
     KA.synchronize(backend)
 end
@@ -107,32 +79,10 @@ end
 ```
     
 """
-@kernel function GradientOnEdge(@Const(cellsOnEdge), 
-                                @Const(dcEdge), 
-                                @Const(maxLevelEdgeTop),
-                                @Const(ScalarCell), 
-                                GradEdge)
-    # global indices over nEdges
-    iEdge = @index(Global, Linear)
-
-    # cell connectivity information for iEdge
-    @inbounds jCell1 = cellsOnEdge[1,iEdge]      
-    @inbounds jCell2 = cellsOnEdge[2,iEdge]
-    
-    # inverse edge spacing for iEdge
-    @inbounds InvDcEdge = 1. / dcEdge[iEdge]
-  
-    for k in 1:maxLevelEdgeTop[iEdge]
-        # gradient on edges calculation 
-        GradEdge[k, iEdge] = InvDcEdge * 
-                             (ScalarCell[k, jCell2] - ScalarCell[k, jCell1])
-    end
-end
-
-@kernel function GradientOnEdgeModified(@Const(cellsOnEdge), 
-                                        @Const(dcEdge),
-                                        @Const(ScalarCell), 
-                                        GradEdge)
+@kernel function GradientOnEdge(GradEdge,
+                                @Const(ScalarCell),
+                                @Const(cellsOnEdge), 
+                                @Const(dcEdge))
     # global indices over nEdges
     iEdge, k = @index(Global, NTuple)
 
@@ -147,37 +97,146 @@ end
     @synchronize()
 end
 
-function GradientOnEdge!(grad, hᵢ, Mesh::Mesh; backend=KA.CPU())
+function GradientOnEdge!(grad, hᵢ, Mesh::Mesh; backend=KA.CPU(), workgroupsize=64)
    
     @unpack HorzMesh, VertMesh = Mesh    
 
     @unpack Edges = HorzMesh
-    @unpack maxLevelEdge = VertMesh 
+    @unpack nVertLevels = VertMesh 
     @unpack nEdges, dcEdge, cellsOnEdge = Edges
     
     kernel! = GradientOnEdge(backend)
 
-    kernel!(cellsOnEdge, dcEdge, maxLevelEdge.Top, hᵢ, grad, ndrange=nEdges)
+    kernel!(grad, 
+            hᵢ, 
+            cellsOnEdge,
+            dcEdge,
+            workgroupsize=workgroupsize,
+            ndrange=(nEdges, nVertLevels))
 
     KA.synchronize(backend)
 end
 
-#@doc raw"""
-#"""
-#@kernel function TangentialReconOnEdge(@Const(nEdgesOnEdge),
-#                                       @Const(edgesOnEdge),
-#                                       @Const(weightsOnEdge),
-#                                       @Const(VecEdge),
-#                                       ReconEdge)
-#end 
+@kernel function CurlOnVertex(CurlVertex,
+                              @Const(VecEdge),
+                              @Const(edgesOnVertex),
+                              @Const(dcEdge), 
+                              @Const(edgeSignOnVertex), 
+                              @Const(areaTriangle), 
+                              @Const(vertexDegree))
 
+    # global indicies over nVertices and vertexDegree
+    iVertex, k = @index(Global, NTuple)
+   
+    #CurlVertex[k, iVertex] = 0.0
 
-function interpolateCell2Edge!(edgeValue, cellValue, Mesh::Mesh; backend = KA.CPU())
+    @inbounds @private invAreaTriangle = 1.0 / areaTriangle[iVertex]
+
+    for j in 1:vertexDegree
+        @inbounds @private iEdge = edgesOnVertex[j, iVertex]
+
+        @inbounds CurlVertex[k, iVertex] += dcEdge[iEdge] *
+                                            invAreaTriangle *
+                                            VecEdge[k, iEdge] *
+                                            edgeSignOnVertex[j, iVertex]
+    end
+
+    @synchronize()
+end
+
+function CurlOnVertex!(CurlVertex, VecEdge, Mesh::Mesh; backend = KA.CPU())
+
+    @unpack HorzMesh, VertMesh = Mesh    
+
+    @unpack nVertLevels, maxLevelVertex = VertMesh 
+    @unpack DualCells, Edges = HorzMesh
+
+    @unpack nEdges, dcEdge = Edges
+    @unpack nVertices, vertexDegree = DualCells
+    @unpack areaTriangle, edgeSignOnVertex, edgesOnVertex = DualCells
+
+    kernel! = CurlOnVertex(backend)
+    
+    kernel!(CurlVertex,
+            VecEdge,
+            edgesOnVertex,
+            dcEdge,
+            edgeSignOnVertex, 
+            areaTriangle,
+            vertexDegree,
+            ndrange=(nVertices, nVertLevels))
+           
+
+    KA.synchronize(backend)
+end
+
+#=
+@kernel function CurlOnVertex_P1(VecEdge, @Const(dcEdge))
+
+    iEdge, k = @index(Global, NTuple)
+    @inbounds VecEdge[k, iEdge] = VecEdge[k,iEdge] * dcEdge[iEdge]
+    @synchronize()
+end
+
+@kernel function CurlOnVertex_P2(CurlVertex, 
+                                @Const(VecEdge), 
+                                @Const(edgesOnVertex),
+                                @Const(edgeSignOnVertex), 
+                                @Const(areaTriangle), 
+                                @Const(vertexDegree))
+    
+    # i -> nVertices
+    # k -> nVertLevels
+    iVertex, k = @index(Global, NTuple)
+    
+    @inbounds @private invAreaTriangle = 1.0 / areaTriangle[iVertex]
+    
+    for j in 1:vertexDegree
+        @inbounds @private iEdge = edgesOnVertex[j, iVertex]
+        
+        @inbounds CurlVertex[k, iVertex] += invAreaTriangle *
+                                            VecEdge[k, iEdge] *
+                                            edgeSignOnVertex[j, iVertex]
+    end
+
+    @synchronize()
+end
+
+function CurlOnVertex!(CurlVertex, VecEdge, Mesh::Mesh; backend = KA.CPU())
+
+    @unpack HorzMesh, VertMesh = Mesh    
+
+    @unpack nVertLevels, maxLevelVertex = VertMesh 
+    @unpack DualCells, Edges = HorzMesh
+
+    @unpack nEdges, dcEdge = Edges
+    @unpack nVertices, vertexDegree = DualCells
+    @unpack areaTriangle, edgeSignOnVertex, edgesOnVertex = DualCells
+
+    kernel1! = CurlOnVertex_P1(backend)
+    kernel2! = CurlOnVertex_P2(backend)
+
+    kernel1!(VecEdge, dcEdge, ndrange=(nEdges, nVertLevels), workgroupsize=64)
+
+    kernel2!(CurlVertex,
+             VecEdge,
+             edgesOnVertex,
+             edgeSignOnVertex, 
+             areaTriangle,
+             vertexDegree,
+             ndrange=(nVertices, nVertLevels))
+           
+    KA.synchronize(backend)
+end
+=#
+
+function interpolateCell2Edge!(edgeValue, cellValue, Mesh::Mesh;
+                               backend = KA.CPU(), workgroupsize=64)
     
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack Edges = HorzMesh
 
-    @unpack maxLevelEdge = VertMesh 
+    @unpack nVertLevels = VertMesh 
     @unpack nEdges, cellsOnEdge = Edges
 
     kernel! = interpolateCell2Edge(backend)
@@ -185,25 +244,26 @@ function interpolateCell2Edge!(edgeValue, cellValue, Mesh::Mesh; backend = KA.CP
     kernel!(edgeValue,
             cellValue,
             cellsOnEdge,
-            maxLevelEdge.Top,
-            ndrange=nEdges)
+            workgroupsize=workgroupsize,
+            ndrange=(nEdges, nVertLevels))
 
     KA.synchronize(backend)
 end
 
 @kernel function interpolateCell2Edge(edgeValue, 
                                       @Const(cellValue), 
-                                      @Const(cellsOnEdge), 
-                                      @Const(maxLevelEdgeTop))
+                                      @Const(cellsOnEdge))
+    # global indices over nEdges
+    iEdge, k = @index(Global, NTuple)
 
+    # TODO: add conditional statement to check for masking if needed
 
-    iEdge = @index(Global, Linear)
-    
-    @inbounds iCell1 = cellsOnEdge[1,iEdge]
-    @inbounds iCell2 = cellsOnEdge[2,iEdge]
+    # cell connectivity information for iEdge
+    @inbounds @private iCell1 = cellsOnEdge[1,iEdge]      
+    @inbounds @private iCell2 = cellsOnEdge[2,iEdge]
 
-    @inbounds for k in 1:maxLevelEdgeTop[iEdge]
-        edgeValue[k, iEdge] = 0.5 * (cellValue[k, iCell1] +
-                                     cellValue[k, iCell2])
-    end
+    @inbounds edgeValue[k, iEdge] = 0.5 * (cellValue[k, iCell1] +
+                                           cellValue[k, iCell2])
+
+    @synchronize()
 end

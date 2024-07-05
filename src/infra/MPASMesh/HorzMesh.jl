@@ -304,11 +304,10 @@ function signIndexField!(primaryCells::PrimaryCells, edges::Edges)
         else 
             edgeSignOnCell[i, iCell] = 1
         end 
-    
-        # PrimaryCell struct is immutable so need to use Accessor package,
-        # convert mutable array to the immutable NTuple type of a Primary Cell 
-        @reset primaryCells.edgeSignOnCell = edgeSignOnCell
     end    
+    
+    # PrimaryCell struct is immutable so need to use Accessor package,
+    @reset primaryCells.edgeSignOnCell = edgeSignOnCell
 end 
 
 function signIndexField!(dualMesh::DualCells, edges::Edges)
@@ -316,21 +315,20 @@ function signIndexField!(dualMesh::DualCells, edges::Edges)
     @unpack verticesOnEdge = edges
     @unpack vertexDegree, nVertices, edgeSignOnVertex, edgesOnVertex = dualMesh 
 
-    @inbounds for iVertex in 1:nVertices, i in 1:vertexDegree[iVertex]
+    for iVertex in 1:nVertices, i in 1:vertexDegree
          
-        iEdge = edgesOnVertex[i, iVertex]
+        @inbounds iEdge = edgesOnVertex[i, iVertex]
         
         # vector points from cell 1 to cell 2
         if iVertex == verticesOnEdge[1, iEdge]
-            edgeSignOnVertex[i, iVertex] = -1
+            @inbounds edgeSignOnVertex[i, iVertex] = -1
         else 
-            edgeSignOnVertex[i, iVertex] = 1
+            @inbounds edgeSignOnVertex[i, iVertex] = 1
         end 
-    
-        # DualCell struct is immutable so need to use Accessor package,
-        # convert mutable array to the immutable NTuple type of a Dual Cell 
-        @reset dualMesh.edgeSignOnVertex = edgeSignOnVertex
     end    
+    
+    # DualCell struct is immutable so need to use Accessor package,
+    @reset dualMesh.edgeSignOnVertex = edgeSignOnVertex
 end 
 
 function ReadHorzMesh(meshPath::String; backend=KA.CPU())

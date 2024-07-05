@@ -1,9 +1,9 @@
 using Test
 using Dates
 using UnPack
-using MPAS_O: Clock, changeTimeStep!, attachAlarm!, advance!,
-              OneTimeAlarm, PeriodicAlarm, isRinging, updateStatus!,
-              rename!, stop!, reset!, mpas_create_clock, Alarm, setCurrentTime! 
+using MOKA: Clock, changeTimeStep!, attachAlarm!, advance!,
+            OneTimeAlarm, PeriodicAlarm, isRinging, updateStatus!,
+            rename!, stop!, reset!, mpas_create_clock, Alarm, setCurrentTime! 
 # alernatively should make a module for timeMagament / infra 
 # to deal withe the namespace managment there
 
