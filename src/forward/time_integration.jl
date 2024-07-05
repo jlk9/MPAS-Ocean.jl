@@ -14,13 +14,11 @@ function advanceTimeLevels!(Prog::PrognosticVars)
         
         if size(field)[end] > 2 error("nTimeLevels must be <= 2") end
 
-        field = circshift(field, dims)
-
         # some short hand for this would be nice
-        if field_name == :ssh 
-            field[:,end] = field[:,end-1]
+        if ndims(field) == 2
+            field[:,end-1] = field[:,end]
         else
-            field[:,:,end] = field[:,:,end-1]
+            field[:,:,end-1] = field[:,:,end]
         end
 
         setproperty!(Prog, field_name, field)
@@ -120,22 +118,20 @@ end
 function ocn_timestep(Prog::PrognosticVars, 
                       Diag::DiagnosticVars,
                       Tend::TendencyVars, 
-                      S::ModelSetup, 
+                      S::ModelSetup,
                       ::Type{ForwardEuler};
                       backend = KA.CPU())
+
+    Mesh = S.mesh
+    Clock = S.timeManager
+    Config = S.config
     
-    Mesh = S.mesh 
-    Clock = S.timeManager 
-    Config = S.config 
-
-    time = convert(Float64, Dates.value(Second(Clock.currTime - Clock.startTime)))
-
     # advance the timelevels within the state strcut 
     advanceTimeLevels!(Prog)
-
+    
     # convert the timestep to seconds 
     dt = convert(Float64, Dates.value(Second(Clock.timeStep)))
-    
+
     # unpack the state variable arrays 
     @unpack ssh, normalVelocity, layerThickness = Prog
 
@@ -151,18 +147,17 @@ function ocn_timestep(Prog::PrognosticVars,
 
     # unpack the tendency variable arrays 
     @unpack tendNormalVelocity, tendLayerThickness = Tend 
-
-    # update the state variables by the tendencies 
-    normalVelocity[:,:,end] .+= dt .* tendNormalVelocity 
-    #normalVelocity[:,:,end] = exact_norm_vel(iGE, time)
-
-    #ssh[:,end] = exact_ssh(iGE, time) 
-    #layerThickness[:,:,end] .= Diag.restingThickness[:,:] .+ reshape(Prog.ssh[:,end], 1, :) 
-
-    layerThickness[:,:,end] .+= dt .* tendLayerThickness 
-    ssh[:,end] = layerThickness[:,:,end] .- sum(Mesh.VertMesh.restingThickness; dims=1)
-
     
-    # pack the updated state varibales in the Prognostic structure
-    @pack! Prog = ssh, normalVelocity, layerThickness 
+    # update the state variables by the tendencies 
+    normalVelocity[:,:,end] .+= dt .* tendNormalVelocity
+    layerThickness[:,:,end] .+= dt .* tendLayerThickness
+    
+    ssh[:,end] = Prog.layerThickness[1,:,end]
+
+    ssh_length = size(Prog.ssh)[1]
+    for j = 1:ssh_length
+        ssh[j,end] = ssh[j,end] - Mesh.VertMesh.restingThicknessSum[j]
+    end
+
+    @pack! Prog = ssh, normalVelocity, layerThickness
 end 

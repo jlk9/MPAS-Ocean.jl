@@ -135,11 +135,10 @@ function calculate_layerThicknessEdge!(Diag::DiagnosticVars,
     @pack! Diag = layerThicknessEdge
 end 
 
-function calculate_thicknessFlux!(Diag::DiagnosticVars, 
-                                  Prog::PrognosticVars, 
+function calculate_thicknessFlux!(Diag::DiagnosticVars,
+                                  Prog::PrognosticVars,
                                   Mesh::Mesh;
-                                  backend = KA.CPU()) 
-    
+                                  backend = KA.CPU())
 
     normalVelocity = Prog.normalVelocity[:,:,end]
     @unpack thicknessFlux, layerThicknessEdge = Diag 
