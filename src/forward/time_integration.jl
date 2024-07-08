@@ -154,10 +154,12 @@ function ocn_timestep(Prog::PrognosticVars,
     
     ssh[:,end] = Prog.layerThickness[1,:,end]
 
-    ssh_length = size(Prog.ssh)[1]
-    for j = 1:ssh_length
-        ssh[j,end] = ssh[j,end] - Mesh.VertMesh.restingThicknessSum[j]
-    end
+    #ssh_length = size(Prog.ssh)[1]
+    #for j = 1:ssh_length
+    #    ssh[j,end] = ssh[j,end] - Mesh.VertMesh.restingThicknessSum[j]
+    #end
+
+    ssh[:,end] .= ssh[:,end] .- Mesh.VertMesh.restingThicknessSum[:]
 
     @pack! Prog = ssh, normalVelocity, layerThickness
 end 
