@@ -4,12 +4,11 @@ function ocn_init(Config_filepath; backend=KA.CPU())
     
     # read the configuration file 
     Config = ConfigRead(Config_filepath)
-
+    
     #TO DO: Read constants ?? 
 
     # setup the mesh 
     Mesh = ocn_setup_mesh(Config; backend=backend)
-
     # setup clock 
     Clock = ocn_setup_clock(Config)
     
@@ -38,11 +37,11 @@ function ocn_setup_mesh(Config::GlobalConfig; backend=KA.CPU())
     mesh_fp = ConfigGet(meshConfig, "filename_template")
     # read the inut mesh from the configuartion file 
     # NOTE: This might be a restart file based on config options 
-
+    
     h_mesh = ReadHorzMesh(mesh_fp; backend=backend)
     v_mesh = VerticalMesh(mesh_fp, h_mesh; backend=backend)
 
-    Mesh(h_mesh, v_mesh)
+    return Mesh(h_mesh, v_mesh)
 end 
 
 function ocn_setup_clock(Config::GlobalConfig)

@@ -29,14 +29,14 @@ end
 ActiveLevels constructor for a nVertLevel stacked *periodic* meshes
 """
 function ActiveLevels(dim, eltype, backend, nVertLevels)
-    Top = KA.ones(backend, eltype, dim) .* eltype(nVertLevels)
-    Bot = KA.ones(backend, eltype, dim) .* eltype(nVertLevels)
+    Top = KA.ones(backend, eltype, dim) #.* eltype(nVertLevels)
+    Bot = KA.ones(backend, eltype, dim) #.* eltype(nVertLevels)
 
-    ActiveLevels(Top, Bot)
+    return ActiveLevels(Top, Bot)
 end
 
 function ActiveLevels{Edge}(mesh; backend=KA.CPU(), nVertLevels=1)
-    ActiveLevels(mesh.Edges.nEdges, Int32, backend, nVertLevels)
+    return ActiveLevels(mesh.Edges.nEdges, Int32, backend, nVertLevels)
 end
 
 function ActiveLevels{Vertex}(mesh; backend=KA.CPU(), nVertLevels=1)
@@ -50,12 +50,12 @@ function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
     if uppercase(ds.attrib["is_periodic"]) != "YES"
         error("Support for non-periodic meshes is not yet implemented")
     end
-
+    
     nVertLevels = ds.dim["nVertLevels"]
     minLevelCell = ds["minLevelCell"][:]
     maxLevelCell = ds["maxLevelCell"][:]
     restingThickness = ds["restingThickness"][:,:,1]
-
+    
     # check that the vertical mesh is stacked 
     if !all(maxLevelCell .== nVertLevels)
         @error """ (Vertical Mesh Initializaton)\n
@@ -64,7 +64,7 @@ function VerticalMesh(mesh_fp, mesh; backend=KA.CPU())
                """
     end
 
-
+    
     ActiveLevelsEdge = ActiveLevels{Edge}(mesh; backend=backend,
                                           nVertLevels=nVertLevels)
     ActiveLevelsVertex = ActiveLevels{Vertex}(mesh; backend=backend, 
