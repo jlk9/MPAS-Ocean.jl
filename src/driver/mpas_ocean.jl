@@ -24,16 +24,16 @@ function ocn_run(config_fp)
     #
     
     println("Setting the backend...")
-    #backend = KA.CPU()
-    backend = CUDABackend()
+    backend = KA.CPU()
+    #backend = CUDABackend()
     @show backend
-
+    
     # Initialize the Model  
     Setup, Diag, Tend, Prog             = ocn_init(config_fp, backend = backend)
     println("Initialized the model")
     clock, simulationAlarm, outputAlarm = ocn_init_alarms(Setup)
     println("Initialized the clock.")
-
+    
     ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
 
     #
