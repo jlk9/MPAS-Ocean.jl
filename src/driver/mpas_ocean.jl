@@ -4,7 +4,7 @@ using MOKA
 using Statistics
 using KernelAbstractions
 
-using Enzyme
+#using Enzyme
 
 # Might need to remove these:
 #Enzyme.EnzymeRules.inactive_type(::Type{<:MOKA.ModelSetup}) = true
@@ -175,10 +175,12 @@ function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAl
     end
 
     sum = 0.0
+    #=
     ssh_length = size(Prog.ssh)[1]
     for j = 1:ssh_length
         sum = sum + Prog.ssh[j,2]^2
     end
+    =#
 
     return sum
 end
