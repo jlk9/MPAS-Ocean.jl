@@ -103,7 +103,13 @@ function ConfigRead(filepath::AbstractString)
     # load YAML file as a dictionary
     config = YAML.load_file(filepath)
 
-    # Extract the "streams"/"namelist" dicts from the global YAML dict
+    # load YAML file where dictionary keys are forced to types defined in 
+    # the dictionary above. 
+    config = open(filepath, "r") do input
+        load_MPAS(input, MPAS_Custom_Constructor(); resolver=MPAS_Custom_Resolver())
+    end 
+
+    # Extract the "streams" dictionary from the namelist dictionary 
     streams = pop!(config["omega"], "streams")
     namelist = pop!(config, "omega")
 
@@ -223,3 +229,53 @@ function DateTime_from_String(string::String)
     # the original string after having raised a warning
     return string
 end
+ 
+function MPAS_Custom_Resolver()
+    # Make is so that the resolver and the constructor regex pattern 
+    # are both added globably. 
+    MPAS_TimeStamp_Resolver = tuple("tag:MPAS_timestamp", timestamp_pat) 
+ 
+    # Instansiate the Resolver struct, so that the defaults can be 
+    # over written and passed to our custom `load` method 
+    resolver = Resolver()
+
+    # append the custom MPAS timestamp resolver to the end of the arrray
+    # of regex patterns within the instance of the `Resolver`
+    push!(resolver.implicit_resolvers, MPAS_TimeStamp_Resolver)
+
+    resolver 
+end 
+
+"""Create a custom constructor object, which is able to parse 
+the MPAS timestamp format. 
+"""
+function MPAS_Custom_Constructor()
+    # Get the deafault constructors
+	yaml_constructors = copy(YAML.default_yaml_constructors)
+	# Add a new constructor, for the MPAS timestamps  
+	yaml_constructors["tag:MPAS_timestamp"] = construct_MPAS_TimeStamp
+	# return an Construcutor object, which will parse the MPAS timestamps
+	YAML.Constructor(yaml_constructors)
+end
+
+
+function compose_MPAS(events; resolver::Union{Resolver, Nothing}=nothing)
+    # if no resolver was passed, return default resolver. 
+    # otherwise use resolver passed as kwarg 
+    resolver = resolver ==  nothing ? Resolver : resolver 
+    composer = Composer(events, Dict{String, Node}(), resolver)
+    @assert typeof(forward!(composer.input)) == StreamStartEvent
+    node = compose_document(composer)
+    if typeof(peek(composer.input)) == StreamEndEvent
+        forward!(composer.input)
+    else 
+        @assert typeof(peek(composer.input)) == DocumentStartEvent
+    end 
+    node
+end 
+
+load_MPAS(ts::TokenStream, constructor::Constructor; resolver::Resolver) = 
+    construct_document(constructor, compose_MPAS(EventStream(ts); resolver=resolver))
+
+load_MPAS(input::IO, constructor::Constructor; kwargs...) = load_MPAS(TokenStream(input), constructor; kwargs...)
+
