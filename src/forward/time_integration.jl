@@ -2,7 +2,9 @@
 abstract type timeStepper end 
 # define the supported timeStepper types to dispatch on. 
 abstract type ForwardEuler <: timeStepper end 
-abstract type RungeKutta4  <: timeStepper end 
+abstract type RungeKutta4  <: timeStepper end
+
+using CUDA: @allowscalar
 
 function advanceTimeLevels!(Prog::PrognosticVars)
     
@@ -156,7 +158,7 @@ function ocn_timestep(Prog::PrognosticVars,
 
     ssh_length = size(Prog.ssh)[1]
     for j = 1:ssh_length
-        ssh[j,end] = ssh[j,end] - Mesh.VertMesh.restingThicknessSum[j]
+        @allowscalar ssh[j,end] = ssh[j,end] - Mesh.VertMesh.restingThicknessSum[j]
     end
 
     #ssh[:,end] .= ssh[:,end] .- Mesh.VertMesh.restingThicknessSum[:]
