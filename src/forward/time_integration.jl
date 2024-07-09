@@ -7,7 +7,7 @@ abstract type RungeKutta4  <: timeStepper end
 #using CUDA: @allowscalar
 using KernelAbstractions
 
-function advanceTimeLevels!(Prog::PrognosticVars; backend=KA.CPU())
+function advanceTimeLevels!(Prog::PrognosticVars; backend=CUDABackend())
 
     kernel2d! = advance_2d_array(backend)
     kernel3d! = advance_3d_array(backend)
@@ -141,7 +141,7 @@ function ocn_timestep(Prog::PrognosticVars,
                       Tend::TendencyVars, 
                       S::ModelSetup,
                       ::Type{ForwardEuler};
-                      backend = KA.CPU())
+                      backend = CUDABackend())
 
     Mesh = S.mesh
     Clock = S.timeManager
