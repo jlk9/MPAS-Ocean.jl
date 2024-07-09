@@ -4,7 +4,7 @@ using MOKA
 using Statistics
 using KernelAbstractions
 
-#using Enzyme
+using Enzyme
 
 # Might need to remove these:
 #Enzyme.EnzymeRules.inactive_type(::Type{<:MOKA.ModelSetup}) = true
@@ -29,7 +29,7 @@ function ocn_run(config_fp)
     @show backend
     
     # Initialize the Model  
-    Setup, Diag, Tend, Prog             = ocn_init(config_fp, backend = backend)
+    Setup, Diag, Tend, Prog             = ocn_init(config_fp; backend = backend)
     println("Initialized the model")
     clock, simulationAlarm, outputAlarm = ocn_init_alarms(Setup)
     println("Initialized the clock.")
@@ -57,8 +57,8 @@ function ocn_run_with_ad(config_fp)
     # Setup for model
     #
     
-    backend = KA.CPU()
-    #backend = CUDABackend()
+    #backend = KA.CPU()
+    backend = CUDABackend()
 
     # Initialize the Model  
     Setup, Diag, Tend, Prog             = ocn_init(config_fp, backend = backend)
@@ -164,7 +164,6 @@ function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAl
         advance!(clock)
     
         global i += 1
-        @show i
     
         ocn_timestep(Prog, Diag, Tend, Setup, ForwardEuler; backend=backend)
         
