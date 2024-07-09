@@ -4,9 +4,13 @@ abstract type timeStepper end
 abstract type ForwardEuler <: timeStepper end 
 abstract type RungeKutta4  <: timeStepper end
 
-using CUDA: @allowscalar
+#using CUDA: @allowscalar
+using KernelAbstractions
 
-function advanceTimeLevels!(Prog::PrognosticVars)
+function advanceTimeLevels!(Prog::PrognosticVars; backend=KA.CPU())
+
+    kernel2d! = advance_2d_array(backend)
+    kernel3d! = advance_3d_array(backend)
     
     for field_name in propertynames(Prog)
          
@@ -18,13 +22,29 @@ function advanceTimeLevels!(Prog::PrognosticVars)
 
         # some short hand for this would be nice
         if ndims(field) == 2
-            field[:,end-1] = field[:,end]
+            #field[:,end-1] .= field[:,end]
+            kernel2d!(field, workgroupsize=64, ndrange=size(field)[1])
         else
-            field[:,:,end-1] = field[:,:,end]
+            #field[:,:,end-1] .= field[:,:,end]
+            kernel3d!(field, workgroupsize=64, ndrange=(size(field)[1],size(field)[2]))
         end
 
         setproperty!(Prog, field_name, field)
     end 
+end
+
+@kernel function advance_2d_array(field)
+    j = @index(Global, Linear)
+
+    @inbounds field[j,end-1] = field[j,end]
+    @synchronize()
+end
+
+@kernel function advance_3d_array(field)
+    i, j = @index(Global, NTuple)
+
+    @inbounds field[i,j,end-1] = field[i,j,end]
+    @synchronize()
 end
 
 function ocn_timestep(Prog::PrognosticVars, 
@@ -33,13 +53,12 @@ function ocn_timestep(Prog::PrognosticVars,
                       S::ModelSetup,
                       ::Type{RungeKutta4}; 
                       backend = KA.CPU())
-
     
     Mesh = S.mesh 
     Clock = S.timeManager 
     
     # advance the timelevels within the state strcut 
-    advanceTimeLevels!(Prog)
+    advanceTimeLevels!(Prog; backend=backend)
 
     # convert the timestep to seconds 
     dt = convert(Float64, Dates.value(Second(Clock.timeStep)))
@@ -129,7 +148,7 @@ function ocn_timestep(Prog::PrognosticVars,
     Config = S.config
     
     # advance the timelevels within the state strcut 
-    advanceTimeLevels!(Prog)
+    advanceTimeLevels!(Prog; backend=backend)
     
     # convert the timestep to seconds 
     dt = convert(Float64, Dates.value(Second(Clock.timeStep)))
@@ -157,11 +176,18 @@ function ocn_timestep(Prog::PrognosticVars,
     ssh[:,end] = Prog.layerThickness[1,:,end]
 
     ssh_length = size(Prog.ssh)[1]
-    for j = 1:ssh_length
-        @allowscalar ssh[j,end] = ssh[j,end] - Mesh.VertMesh.restingThicknessSum[j]
-    end
 
-    #ssh[:,end] .= ssh[:,end] .- Mesh.VertMesh.restingThicknessSum[:]
+    kernel! = subtract_array_from_end(backend)
+    kernel!(ssh, Mesh.VertMesh.restingThicknessSum, workgroupsize=64, ndrange=ssh_length)
 
     @pack! Prog = ssh, normalVelocity, layerThickness
 end 
+
+
+@kernel function subtract_array_from_end(ssh, @Const(restingThicknessSum))
+
+    j = @index(Global, Linear)
+
+    @inbounds ssh[j,end] = ssh[j,end] - restingThicknessSum[j]
+    @synchronize()
+end
