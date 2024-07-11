@@ -12,7 +12,8 @@ using KernelAbstractions
 @kernel function DivergenceOnCell_P1(VecEdge, @Const(dvEdge))
 
     iEdge, k = @index(Global, NTuple)
-    @inbounds VecEdge[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
+    #@inbounds VecEdge[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
+    @inbounds VecEdge[k,iEdge,end] = VecEdge[k,iEdge,end] * dvEdge[iEdge]
     @synchronize()
 end
 
@@ -24,25 +25,23 @@ end
                                      @Const(areaCell)) #::Val{n}, where {n}
 
     iCell, k = @index(Global, NTuple)
+    #iCell = @index(Global, Linear)
+    #k = 1
 
     DivCell[k,iCell] = 0.0
-
-    #iEdge_array = @private Float64 (n)
-    #for i in 1:n
-    #    @inbounds iEdge_array[i] = edgesOnCell[i,iCell]
-    #end
 
     # loop over number of edges in primary cell
     for i in 1:nEdgesOnCell[iCell]
         @inbounds iEdge = edgesOnCell[i,iCell]
-        @inbounds DivCell[k,iCell] -= VecEdge[k,iEdge] * edgeSignOnCell[i,iCell]
+        #@inbounds DivCell[k,iCell] -= VecEdge[k,iEdge] * edgeSignOnCell[i,iCell]
+        @inbounds DivCell[k,iCell] -= VecEdge[k,iEdge,end] * edgeSignOnCell[i,iCell]
     end
 
     DivCell[k,iCell] = DivCell[k,iCell] / areaCell[iCell]
     @synchronize()
 end
 
-function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=KA.CPU())
+function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=CUDABackend())
 
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack PrimaryCells, DualCells, Edges = HorzMesh
@@ -52,12 +51,13 @@ function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=KA.CPU())
     @unpack nCells, nEdgesOnCell = PrimaryCells
     @unpack edgesOnCell, edgeSignOnCell, areaCell = PrimaryCells
     
-    kernel1! = DivergenceOnCell_P1(backend)
-    kernel2! = DivergenceOnCell_P2(backend)
+    nthreads = 50
+    kernel1! = DivergenceOnCell_P1(backend, nthreads)
+    kernel2! = DivergenceOnCell_P2(backend, nthreads)
 
     # TODO: Add workgroupsize(s) as kwarg. As named tuple:
     #       DivergenceOnCell!(...; workgroupsizes=(P1 = 64, P2 = 32))
-    kernel1!(VecEdge, dvEdge, workgroupsize=64, ndrange=(nEdges, nVertLevels))
+    kernel1!(VecEdge, dvEdge, ndrange=(nEdges, nVertLevels))
 
     kernel2!(DivCell,
              VecEdge,
@@ -65,7 +65,7 @@ function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=KA.CPU())
              edgesOnCell,
              edgeSignOnCell,
              areaCell,
-             workgroupsize=32,
+             #ndrange=nCells)
              ndrange=(nCells, nVertLevels))
 
     KA.synchronize(backend)
