@@ -9,8 +9,10 @@ using KernelAbstractions
 
 function advanceTimeLevels!(Prog::PrognosticVars; backend=CUDABackend())
 
-    kernel2d! = advance_2d_array(backend)
-    kernel3d! = advance_3d_array(backend)
+    nthreads = 100
+
+    kernel2d! = advance_2d_array(backend, nthreads)
+    kernel3d! = advance_3d_array(backend, nthreads)
     
     for field_name in propertynames(Prog)
          
@@ -23,10 +25,13 @@ function advanceTimeLevels!(Prog::PrognosticVars; backend=CUDABackend())
         # some short hand for this would be nice
         if ndims(field) == 2
             #field[:,end-1] .= field[:,end]
-            kernel2d!(field, workgroupsize=64, ndrange=size(field)[1])
+            #@show size(field), size(field)[1]
+            kernel2d!(field, ndrange=size(field)[1])
         else
             #field[:,:,end-1] .= field[:,:,end]
-            kernel3d!(field, workgroupsize=64, ndrange=(size(field)[1],size(field)[2]))
+            #@show size(field)
+            #kernel3d!(field, ndrange=(size(field)[1],size(field)[2]))
+            kernel3d!(field, ndrange=size(field)[2])
         end
 
         setproperty!(Prog, field_name, field)
@@ -35,15 +40,19 @@ end
 
 @kernel function advance_2d_array(field)
     j = @index(Global, Linear)
-
-    @inbounds field[j,end-1] = field[j,end]
+    if j < 2501
+        @inbounds field[j,1] = field[j,2]
+    end
     @synchronize()
 end
 
 @kernel function advance_3d_array(field)
-    i, j = @index(Global, NTuple)
+    #i, j = @index(Global, NTuple)
+    #@inbounds field[i,j,end-1] = field[i,j,end]
 
-    @inbounds field[i,j,end-1] = field[i,j,end]
+
+    j = @index(Global, Linear)
+    @inbounds field[1,j,end-1] = field[1,j,end]
     @synchronize()
 end
 
@@ -152,13 +161,13 @@ function ocn_timestep(Prog::PrognosticVars,
     
     # convert the timestep to seconds 
     dt = convert(Float64, Dates.value(Second(Clock.timeStep)))
-
+    
     # unpack the state variable arrays 
     @unpack ssh, normalVelocity, layerThickness = Prog
-
+    
     # compute the diagnostics
     diagnostic_compute!(Mesh, Diag, Prog; backend = backend)
-
+    #=
     # compute normalVelocity tenedency 
     computeNormalVelocityTendency!(Tend, Prog, Diag, Mesh, Config;
                                    backend = backend)
@@ -179,8 +188,9 @@ function ocn_timestep(Prog::PrognosticVars,
 
     kernel! = subtract_array_from_end(backend)
     kernel!(ssh, Mesh.VertMesh.restingThicknessSum, workgroupsize=64, ndrange=ssh_length)
-
+    =#
     @pack! Prog = ssh, normalVelocity, layerThickness
+    
 end 
 
 

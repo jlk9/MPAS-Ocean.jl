@@ -1,5 +1,8 @@
 import Adapt
 
+using CUDA
+using KernelAbstractions
+
 mutable struct DiagnosticVars{F <: AbstractFloat, FV2 <: AbstractArray{F,2}}
     
     # var: layer thickness averaged from cell centers to edges [m]
@@ -138,15 +141,34 @@ end
 function calculate_thicknessFlux!(Diag::DiagnosticVars,
                                   Prog::PrognosticVars,
                                   Mesh::Mesh;
-                                  backend = KA.CPU())
+                                  backend = CUDABackend())
 
-    normalVelocity = Prog.normalVelocity[:,:,end]
+    #normalVelocity = Prog.normalVelocity[:,:,end]
     @unpack thicknessFlux, layerThicknessEdge = Diag 
-    
-    # Warning: not performant, this needs to be fixed
-    thicknessFlux .= normalVelocity .* layerThicknessEdge
+
+    nthreads = 100
+    kernel!  = compute_thicknessFlux!(backend, nthreads)
+
+    kernel!(thicknessFlux, Prog.normalVelocity, layerThicknessEdge, ndrange=size(Prog.normalVelocity)[2])
+    #kernel!(thicknessFlux, Prog.normalVelocity, layerThicknessEdge, ndrange=(size(Prog.normalVelocity)[1],size(Prog.normalVelocity)[2]))
 
     @pack! Diag = thicknessFlux
+end
+
+@kernel function compute_thicknessFlux!(thicknessFlux,
+                                        @Const(normalVelocity),
+                                        @Const(layerThicknessEdge))
+
+    j = @index(Global, Linear)
+    if j < 7501
+        @inbounds thicknessFlux[1,j] = normalVelocity[1,j,end] * layerThicknessEdge[1,j]
+    end
+
+    #k, j = @index(Global, NTuple)
+    #if j < 7501
+    #    @inbounds thicknessFlux[k,j] = normalVelocity[k,j,end] * layerThicknessEdge[k,j]
+    #end
+    @synchronize()
 end
 
 function calculate_velocityDivCell!(Diag::DiagnosticVars, 
@@ -154,11 +176,11 @@ function calculate_velocityDivCell!(Diag::DiagnosticVars,
                                     Mesh::Mesh;
                                     backend = KA.CPU()) 
     
-    normalVelocity = Prog.normalVelocity[:,:,end]
+    #normalVelocity = Prog.normalVelocity[:,:,end]
 
     @unpack velocityDivCell = Diag 
 
-    DivergenceOnCell!(velocityDivCell, normalVelocity, Mesh; backend=backend)
+    DivergenceOnCell!(velocityDivCell, Prog.normalVelocity, Mesh; backend=backend)
 
     @pack! Diag = velocityDivCell
 end
