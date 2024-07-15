@@ -16,43 +16,45 @@ function advanceTimeLevels!(Prog::PrognosticVars; backend=CUDABackend())
     
     for field_name in propertynames(Prog)
          
-        dims = field_name == :ssh ? (0,-1) : (0,0,-1)
+        ndim = field_name == :ssh ? 1 : 2
 
         field = getproperty(Prog, field_name)
         
-        if size(field)[end] > 2 error("nTimeLevels must be <= 2") end
+        if length(field) > 2 error("nTimeLevels must be <= 2") end
+
+        # Here: set first entry of Vector{Array} equal to second
 
         # some short hand for this would be nice
-        if ndims(field) == 2
+        if ndim == 1
             #field[:,end-1] .= field[:,end]
             #@show size(field), size(field)[1]
-            kernel2d!(field, ndrange=size(field)[1])
+            kernel2d!(field[1], field[2], ndrange=size(field[1])[1])
         else
             #field[:,:,end-1] .= field[:,:,end]
             #@show size(field)
             #kernel3d!(field, ndrange=(size(field)[1],size(field)[2]))
-            kernel3d!(field, ndrange=size(field)[2])
+            kernel3d!(field[1], field[2], ndrange=size(field[1])[2])
         end
 
         setproperty!(Prog, field_name, field)
     end 
 end
 
-@kernel function advance_2d_array(field)
+@kernel function advance_2d_array(fieldPrev, @Const(fieldNext))
     j = @index(Global, Linear)
     if j < 2501
-        @inbounds field[j,1] = field[j,2]
+        @inbounds fieldPrev[j] = fieldNext[j]
     end
     @synchronize()
 end
 
-@kernel function advance_3d_array(field)
+@kernel function advance_3d_array(fieldPrev, @Const(fieldNext))
     #i, j = @index(Global, NTuple)
-    #@inbounds field[i,j,end-1] = field[i,j,end]
+    #@inbounds fieldPrev[i, j] = fieldNext[i, j]
 
 
     j = @index(Global, Linear)
-    @inbounds field[1,j,end-1] = field[1,j,end]
+    @inbounds fieldPrev[1, j] = fieldNext[1, j]
     @synchronize()
 end
 

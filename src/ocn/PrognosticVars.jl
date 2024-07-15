@@ -3,19 +3,19 @@ using UnPack
 import Adapt
 #using MPAS_O: GlobalConfig, Mesh, ConfigGet, NCDataset
 
-mutable struct PrognosticVars{F<:AbstractFloat, FV2 <: AbstractArray{F,2}, FV3 <: AbstractArray{F, 3}}
+mutable struct PrognosticVars{F<:AbstractFloat, FV1 <: AbstractArray{F,1}, FV2 <: AbstractArray{F,2}, VFV1 <: AbstractVector{FV1}, VFV2 <: AbstractVector{FV2}}
 
     # var: sea surface height [m] 
     # dim: (nCells, Time)
-    ssh::FV2
+    ssh::VFV1
 
     # var: horizonal velocity, normal component to an edge [m s^{-1}]
     # dim: (nVertLevels, nEdges, Time)
-    normalVelocity::FV3
+    normalVelocity::VFV2
 
     # var: layer thickness [m]
     # dim: (nVertLevels, nCells, Time)
-    layerThickness::FV3
+    layerThickness::VFV2
 
     ## var: potential temperature [deg C]
     ## dim: (nVertLevels, nCells, Time)
@@ -25,9 +25,10 @@ mutable struct PrognosticVars{F<:AbstractFloat, FV2 <: AbstractArray{F,2}, FV3 <
     ## dim: (nVertLevels, nCells, Time)
     #salinity::Array{F,3} = zeros(F, nVertLevels, nCells, nTimeLevels)
     
-    function PrognosticVars(ssh::AT2D,
-                            normalVelocity::AT3D,
-                            layerThickness::AT3D) where {AT2D, AT3D}
+    function PrognosticVars(ssh::AT1D,
+                            normalVelocity::AT2D,
+                            layerThickness::AT2D,
+                            nTimeLevels) where {AT1D, AT2D}
 
         # pack all the arguments into a tuple for type and backend checking
         args = (ssh, normalVelocity, layerThickness)
@@ -40,8 +41,19 @@ mutable struct PrognosticVars{F<:AbstractFloat, FV2 <: AbstractArray{F,2}, FV3 <
         # check that all args have the same `eltype` and get that type
         type = check_eltype_args(args)
 
-        new{type, AT2D, AT3D}(ssh, normalVelocity, layerThickness)
-    end        
+        # Stack args into vectors:
+        sshVector = Vector{AT1D}(undef, nTimeLevels)
+        normalVelocityVector = Vector{AT2D}(undef, nTimeLevels)
+        layerThicknessVector = Vector{AT2D}(undef, nTimeLevels)
+
+        for j = 1:nTimeLevels
+            sshVector[j] = deepcopy(ssh)
+            normalVelocityVector[j] = deepcopy(normalVelocity)
+            layerThicknessVector[j] = deepcopy(layerThickness)
+        end
+
+        new{type, AT1D, AT2D, Vector{AT1D}, Vector{AT2D}}(sshVector, normalVelocityVector, layerThicknessVector)
+    end      
 end 
 
 function PrognosticVars(config::GlobalConfig, mesh::Mesh; backend=KA.CPU())
@@ -72,24 +84,30 @@ function PrognosticVars(config::GlobalConfig, mesh::Mesh; backend=KA.CPU())
 
     input = NCDataset(input_filename)
 
-    ssh = zeros(Float64, nCells, nTimeLevels)
-    normalVelocity = zeros(Float64, nVertLevels, nEdges, nTimeLevels)
-    layerThickness = zeros(Float64, nVertLevels, nCells, nTimeLevels)
+    #
+    # TODO: Replace these with Vector{CuMatrix} objects or something similar
+    #
+
+    ssh = zeros(Float64, nCells)
+    normalVelocity = zeros(Float64, nVertLevels, nEdges)
+    layerThickness = zeros(Float64, nVertLevels, nCells)
 
     # TO DO: check that the input file only has one time level 
     # broadcast the input value across all the time levels in the Prog struct
-    ssh[:,:] .= input["ssh"][:,1]
-    normalVelocity[:,:,:] .= input["normalVelocity"][:,:,1]
-    layerThickness[:,:,:] .= input["layerThickness"][:,:,1]
+    ssh[:] .= input["ssh"][:,1]
+    normalVelocity[:,:] .= input["normalVelocity"][:,:,1]
+    layerThickness[:,:] .= input["layerThickness"][:,:,1]
     
     # return instance of Prognostic struct 
     PrognosticVars(Adapt.adapt(backend, ssh),
-                   Adapt.adapt(backend, normalVelocity), 
-                   Adapt.adapt(backend, layerThickness))
-end 
+                   Adapt.adapt(backend, normalVelocity),
+                   Adapt.adapt(backend, layerThickness),
+                   nTimeLevels)
+end
 
 function Adapt.adapt_structure(to, x::PrognosticVars)
-    return PrognosticVars(Adapt.adapt(to, x.ssh),
-                          Adapt.adapt(to, x.normalVelocity), 
-                          Adapt.adapt(to, x.layerThickness))
+    return PrognosticVars(Adapt.adapt(to, x.ssh[1]),
+                          Adapt.adapt(to, x.normalVelocity[1]), 
+                          Adapt.adapt(to, x.layerThickness[1]),
+                          length(x.ssh))
 end

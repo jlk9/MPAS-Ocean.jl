@@ -128,11 +128,11 @@ function calculate_layerThicknessEdge!(Diag::DiagnosticVars,
                                        Mesh::Mesh;
                                        backend = KA.CPU())
     
-    layerThickness = Prog.layerThickness[:,:,end]
+    #layerThickness = Prog.layerThickness[:,:,end]
     @unpack layerThicknessEdge = Diag 
     
     interpolateCell2Edge!(layerThicknessEdge, 
-                          layerThickness,
+                          Prog.layerThickness[end],
                           Mesh; backend = backend)
 
     @pack! Diag = layerThicknessEdge
@@ -149,7 +149,7 @@ function calculate_thicknessFlux!(Diag::DiagnosticVars,
     nthreads = 100
     kernel!  = compute_thicknessFlux!(backend, nthreads)
 
-    kernel!(thicknessFlux, Prog.normalVelocity, layerThicknessEdge, ndrange=size(Prog.normalVelocity)[2])
+    kernel!(thicknessFlux, Prog.normalVelocity[end], layerThicknessEdge, ndrange=size(Prog.normalVelocity)[1])
     #kernel!(thicknessFlux, Prog.normalVelocity, layerThicknessEdge, ndrange=(size(Prog.normalVelocity)[1],size(Prog.normalVelocity)[2]))
 
     @pack! Diag = thicknessFlux
@@ -161,7 +161,7 @@ end
 
     j = @index(Global, Linear)
     if j < 7501
-        @inbounds thicknessFlux[1,j] = normalVelocity[1,j,end] * layerThicknessEdge[1,j]
+        @inbounds thicknessFlux[1,j] = normalVelocity[1,j] * layerThicknessEdge[1,j]
     end
 
     #k, j = @index(Global, NTuple)
@@ -180,7 +180,7 @@ function calculate_velocityDivCell!(Diag::DiagnosticVars,
 
     @unpack velocityDivCell = Diag 
 
-    DivergenceOnCell!(velocityDivCell, Prog.normalVelocity, Mesh; backend=backend)
+    DivergenceOnCell!(velocityDivCell, Prog.normalVelocity[end], Mesh; backend=backend)
 
     @pack! Diag = velocityDivCell
 end
@@ -190,11 +190,11 @@ function calculate_relativeVorticity!(Diag::DiagnosticVars,
                                       Mesh::Mesh;
                                       backend = KA.CPU()) 
 
-    normalVelocity = Prog.normalVelocity[:,:,end]
+    #normalVelocity = Prog.normalVelocity[:,:,end]
 
-    @unpack relativeVorticity = Diag 
+    @unpack relativeVorticity = Diag
 
-    CurlOnVertex!(relativeVorticity, normalVelocity, Mesh; backend=backend)
+    CurlOnVertex!(relativeVorticity, Prog.normalVelocity[end], Mesh; backend=backend)
 
     @pack! Diag = relativeVorticity
 end
