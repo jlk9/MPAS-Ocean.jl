@@ -27,7 +27,12 @@ function computeNormalVelocityTendency!(Tend::TendencyVars,
                                         backend = KA.CPU())
     
     # WARNING: this is not performant and should be fixed
-    Tend.tendNormalVelocity .= 0.0
+    nthreads = 50
+    kernel! = zeroNormalVelocityTendency(backend, nthreads)
+
+    @show size(Tend.tendNormalVelocity)
+    @show Mesh.HorzMesh.Edges.nEdges
+    kernel!(Tend.tendNormalVelocity, ndrange=Mesh.HorzMesh.Edges.nEdges)
 
     #=
     # hard code the pressure gradient as SSH Gradient for now, in the future 
@@ -52,10 +57,30 @@ function computeNormalVelocityTendency!(Tend::TendencyVars,
        )
 end
 
+
+@kernel function zeroNormalVelocityTendency(tendNormalVelocity)
+    j = @index(Global, Linear)
+    #if j < 7501
+    #    tendNormalVelocity[1, j] = 0
+    #end
+    @synchronize()
+end
+
+
+#=
+# WARNING: this is not performant and should be fixed
+Tend.tendNormalVelocity .= 0.0
+
+nthreads = 50
+kernel! = zeroNormalVelocityTendency(backend, nthreads)
+
+kernel!(Tend.tendNormalVelocity, ndrange=Mesh.HorzMesh.Edges.nEdges)
+
 @kernel function zeroNormalVelocityTendency(tendNormalVelocity)
     j = @index(Global, Linear)
     k = 1
-    tendNormalVelocity[k, j] = 0
+    @inbound tendNormalVelocity[k, j] = 0
 end
+=#
 
 end
