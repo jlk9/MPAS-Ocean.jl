@@ -14,8 +14,9 @@ using KernelAbstractions
     #iEdge, k = @index(Global, NTuple)
     iEdge = @index(Global, Linear)
     k = 1
-    #@inbounds VecEdge[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
-    @inbounds VecEdge[k,iEdge,end] = VecEdge[k,iEdge,end] * dvEdge[iEdge]
+    if iEdge < 7501
+        @inbounds VecEdge[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
+    end
     @synchronize()
 end
 
@@ -177,7 +178,7 @@ function CurlOnVertex!(CurlVertex, VecEdge, Mesh::Mesh; backend = KA.CPU())
 end
 
 function interpolateCell2Edge!(edgeValue, cellValue, Mesh::Mesh;
-                               backend = KA.CPU(), workgroupsize=64)
+                               backend = KA.CPU())
     
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack Edges = HorzMesh
@@ -185,13 +186,14 @@ function interpolateCell2Edge!(edgeValue, cellValue, Mesh::Mesh;
     @unpack nVertLevels = VertMesh 
     @unpack nEdges, cellsOnEdge = Edges
 
-    kernel! = interpolateCell2Edge(backend)
+    nthreads = 50
+    kernel!  = interpolateCell2Edge(backend, nthreads)
 
     kernel!(edgeValue,
             cellValue,
             cellsOnEdge,
-            workgroupsize=workgroupsize,
-            ndrange=(nEdges, nVertLevels))
+            ndrange=nEdges)
+            #ndrange=(nEdges, nVertLevels))
 
     KA.synchronize(backend)
 end
@@ -200,16 +202,20 @@ end
                                       @Const(cellValue), 
                                       @Const(cellsOnEdge))
     # global indices over nEdges
-    iEdge, k = @index(Global, NTuple)
+    #iEdge, k = @index(Global, NTuple)
+    iEdge = @index(Global, Linear)
+    k = 1
 
     # TODO: add conditional statement to check for masking if needed
 
     # cell connectivity information for iEdge
-    @inbounds @private iCell1 = cellsOnEdge[1,iEdge]      
-    @inbounds @private iCell2 = cellsOnEdge[2,iEdge]
+    if iEdge < 7501
+        @inbounds @private iCell1 = cellsOnEdge[1,iEdge]      
+        @inbounds @private iCell2 = cellsOnEdge[2,iEdge]
 
-    @inbounds edgeValue[k, iEdge] = 0.5 * (cellValue[k, iCell1] +
-                                           cellValue[k, iCell2])
+        @inbounds edgeValue[k, iEdge] = 0.5 * (cellValue[k, iCell1] +
+                                            cellValue[k, iCell2])
+    end
 
     @synchronize()
 end
