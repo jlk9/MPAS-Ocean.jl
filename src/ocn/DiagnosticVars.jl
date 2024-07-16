@@ -143,13 +143,13 @@ function calculate_thicknessFlux!(Diag::DiagnosticVars,
                                   Mesh::Mesh;
                                   backend = CUDABackend())
 
-    #normalVelocity = Prog.normalVelocity[:,:,end]
+    normalVelocity = Prog.normalVelocity[end]
     @unpack thicknessFlux, layerThicknessEdge = Diag 
 
     nthreads = 100
     kernel!  = compute_thicknessFlux!(backend, nthreads)
 
-    kernel!(thicknessFlux, Prog.normalVelocity[end], layerThicknessEdge, ndrange=size(Prog.normalVelocity)[1])
+    kernel!(thicknessFlux, Prog.normalVelocity[end], layerThicknessEdge, ndrange=size(normalVelocity)[2])
     #kernel!(thicknessFlux, Prog.normalVelocity, layerThicknessEdge, ndrange=(size(Prog.normalVelocity)[1],size(Prog.normalVelocity)[2]))
 
     @pack! Diag = thicknessFlux

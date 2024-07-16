@@ -52,4 +52,10 @@ function computeNormalVelocityTendency!(Tend::TendencyVars,
        )
 end
 
+@kernel function zeroNormalVelocityTendency(tendNormalVelocity)
+    j = @index(Global, Linear)
+    k = 1
+    tendNormalVelocity[k, j] = 0
+end
+
 end

@@ -169,11 +169,12 @@ function ocn_timestep(Prog::PrognosticVars,
     
     # compute the diagnostics
     diagnostic_compute!(Mesh, Diag, Prog; backend = backend)
-    #=
+    
     # compute normalVelocity tenedency 
     computeNormalVelocityTendency!(Tend, Prog, Diag, Mesh, Config;
                                    backend = backend)
-    # compute layerThickness tendency 
+    #=
+    # compute layerThickness tendency
     computeLayerThicknessTendency!(Tend, Prog, Diag, Mesh, Config;
                                    backend = backend)
 
