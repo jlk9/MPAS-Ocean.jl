@@ -3,11 +3,10 @@ module normalVelocity
 export computeNormalVelocityTendency!
 
 using UnPack
-using KernelAbstractions 
-using CUDA: @allowscalar
+using KernelAbstractions
 using MOKA: TendencyVars, PrognosticVars, DiagnosticVars, Mesh, GlobalConfig
 
-const KA = KernelAbstractions
+#const KA = KernelAbstractions
 
 # include tendecy methods
 include("pressure_gradient.jl")
@@ -24,15 +23,16 @@ function computeNormalVelocityTendency!(Tend::TendencyVars,
                                         Diag::DiagnosticVars, 
                                         Mesh::Mesh, 
                                         Config::GlobalConfig;
-                                        backend = KA.CPU())
+                                        backend = CUDABackend())
     
     # WARNING: this is not performant and should be fixed
     nthreads = 50
     kernel! = zeroNormalVelocityTendency(backend, nthreads)
 
-    @show size(Tend.tendNormalVelocity)
-    @show Mesh.HorzMesh.Edges.nEdges
-    kernel!(Tend.tendNormalVelocity, ndrange=Mesh.HorzMesh.Edges.nEdges)
+    #@show size(Tend.tendNormalVelocity)
+    #@show Mesh.HorzMesh.Edges.nEdges
+    #@show Tend.tendNormalVelocity
+    kernel!(Tend.tendNormalVelocity, Mesh.HorzMesh.Edges.nEdges, ndrange=Mesh.HorzMesh.Edges.nEdges)
 
     #=
     # hard code the pressure gradient as SSH Gradient for now, in the future 
@@ -58,11 +58,11 @@ function computeNormalVelocityTendency!(Tend::TendencyVars,
 end
 
 
-@kernel function zeroNormalVelocityTendency(tendNormalVelocity)
+@kernel function zeroNormalVelocityTendency(tendNormalVelocity, length)
     j = @index(Global, Linear)
-    #if j < 7501
-    #    tendNormalVelocity[1, j] = 0
-    #end
+    if j < length + 1
+        tendNormalVelocity[1, j] = 0.0
+    end
     @synchronize()
 end
 

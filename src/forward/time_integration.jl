@@ -28,33 +28,34 @@ function advanceTimeLevels!(Prog::PrognosticVars; backend=CUDABackend())
         if ndim == 1
             #field[:,end-1] .= field[:,end]
             #@show size(field), size(field)[1]
-            kernel2d!(field[1], field[2], ndrange=size(field[1])[1])
+            kernel2d!(field[1], field[2], size(field[1])[1], ndrange=size(field[1])[1])
         else
             #field[:,:,end-1] .= field[:,:,end]
             #@show size(field)
             #kernel3d!(field, ndrange=(size(field)[1],size(field)[2]))
-            kernel3d!(field[1], field[2], ndrange=size(field[1])[2])
+            kernel3d!(field[1], field[2], size(field[1])[2], ndrange=size(field[1])[2])
         end
 
         setproperty!(Prog, field_name, field)
     end 
 end
 
-@kernel function advance_2d_array(fieldPrev, @Const(fieldNext))
+@kernel function advance_2d_array(fieldPrev, @Const(fieldNext), length)
     j = @index(Global, Linear)
-    if j < 2501
+    if j < length + 1
         @inbounds fieldPrev[j] = fieldNext[j]
     end
     @synchronize()
 end
 
-@kernel function advance_3d_array(fieldPrev, @Const(fieldNext))
+@kernel function advance_3d_array(fieldPrev, @Const(fieldNext), length)
     #i, j = @index(Global, NTuple)
     #@inbounds fieldPrev[i, j] = fieldNext[i, j]
 
-
     j = @index(Global, Linear)
-    @inbounds fieldPrev[1, j] = fieldNext[1, j]
+    if j < length + 1
+        @inbounds fieldPrev[1, j] = fieldNext[1, j]
+    end
     @synchronize()
 end
 

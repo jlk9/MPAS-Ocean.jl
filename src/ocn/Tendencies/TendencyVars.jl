@@ -48,7 +48,7 @@ mutable struct TendencyVars{F<:AbstractFloat, FV2 <: AbstractArray{F,2}}
     end
 end 
 
-function TendencyVars(Config::GlobalConfig, Mesh::Mesh; backend=KA.CPU())
+function TendencyVars(Config::GlobalConfig, Mesh::Mesh; backend=CUDABackend())
         
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack PrimaryCells, Edges = HorzMesh
@@ -58,10 +58,12 @@ function TendencyVars(Config::GlobalConfig, Mesh::Mesh; backend=KA.CPU())
     nVertLevels = VertMesh.nVertLevels
 
     # create zero vectors to store tendecy vars on the desired backend
-    tendNormalVelocity = KA.zeros(backend, Float64, nVertLevels, nEdges) 
+    tendNormalVelocity = zeros(Float64, nVertLevels, nEdges) 
     tendLayerThickness = KA.zeros(backend, Float64, nVertLevels, nCells)
 
-    TendencyVars(tendNormalVelocity, tendLayerThickness) 
+
+
+    TendencyVars(Adapt.adapt(backend, tendNormalVelocity), tendLayerThickness)
 end 
 
 function axb!(a::Array{T,2}, x::T, b::Array{T,2}) where {T<:AbstractFloat}

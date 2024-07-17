@@ -9,12 +9,12 @@ using KernelAbstractions
                                        n_{\rm e,i} F_{\rm e} l_{\rm e}
 ```
 """
-@kernel function DivergenceOnCell_P1(VecEdge, @Const(dvEdge))
+@kernel function DivergenceOnCell_P1(VecEdge, @Const(dvEdge), length)
 
     #iEdge, k = @index(Global, NTuple)
     iEdge = @index(Global, Linear)
     k = 1
-    if iEdge < 7501
+    if iEdge < length + 1
         @inbounds VecEdge[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
     end
     @synchronize()
@@ -60,7 +60,7 @@ function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=CUDABackend())
     # TODO: Add workgroupsize(s) as kwarg. As named tuple:
     #       DivergenceOnCell!(...; workgroupsizes=(P1 = 64, P2 = 32))
     #kernel1!(VecEdge, dvEdge, ndrange=(nEdges, nVertLevels))
-    kernel1!(VecEdge, dvEdge, ndrange=nEdges)
+    kernel1!(VecEdge, dvEdge, nEdges, ndrange=nEdges)
 
     kernel2!(DivCell,
              VecEdge,
@@ -192,6 +192,7 @@ function interpolateCell2Edge!(edgeValue, cellValue, Mesh::Mesh;
     kernel!(edgeValue,
             cellValue,
             cellsOnEdge,
+            nEdges,
             ndrange=nEdges)
             #ndrange=(nEdges, nVertLevels))
 
@@ -200,7 +201,8 @@ end
 
 @kernel function interpolateCell2Edge(edgeValue, 
                                       @Const(cellValue), 
-                                      @Const(cellsOnEdge))
+                                      @Const(cellsOnEdge),
+                                      length)
     # global indices over nEdges
     #iEdge, k = @index(Global, NTuple)
     iEdge = @index(Global, Linear)
@@ -209,7 +211,7 @@ end
     # TODO: add conditional statement to check for masking if needed
 
     # cell connectivity information for iEdge
-    if iEdge < 7501
+    if iEdge < length + 1
         @inbounds @private iCell1 = cellsOnEdge[1,iEdge]      
         @inbounds @private iCell2 = cellsOnEdge[2,iEdge]
 
