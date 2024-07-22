@@ -24,12 +24,13 @@ function horizontal_advection_and_coriolis_tendency!(Tend::TendencyVars,
     @unpack weightsOnEdge, fᵉ, cellsOnEdge, edgesOnEdge = Edges
 
     # get the current timelevel of normalVelocity
-    normalVelocity = Prog.normalVelocity
+    normalVelocity = Prog.normalVelocity[end]
     # unpack the normal velocity tendency term
     @unpack tendNormalVelocity = Tend 
 
     # initialize the kernel
-    kernel! = coriolis_force_tendency_kernel!(backend)
+    nthreads = 50
+    kernel!  = coriolis_force_tendency_kernel!(backend, nthreads)
     # use kernel to compute coriolis and horizontal advection
     kernel!(tendNormalVelocity,
             normalVelocity,
