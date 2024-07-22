@@ -1,5 +1,8 @@
 # define our parent abstract type 
-abstract type PresssureGradient end 
+abstract type PresssureGradient end
+
+using KernelAbstractions
+const KA=KernelAbstractions
 
 # define the supported PressureGradient types to dispatch on. 
 abstract type sshGradient <: PresssureGradient end 
@@ -18,12 +21,13 @@ function pressure_gradient_tendency!(Tend::TendencyVars,
     @unpack nEdges, dcEdge, cellsOnEdge = Edges
    
     # get the current timelevel of ssh 
-    ssh = Prog.ssh #[:,end]
+    ssh = Prog.ssh[end] #[:,end]
     # unpack the normal velocity tendency term
     @unpack tendNormalVelocity = Tend 
     
     # initialize the kernel
-    kernel! = SSHGradOnEdge!(backend)
+    nthreads = 50
+    kernel! = SSHGradOnEdge!(backend, nthreads)
     # use kernel to compute gradient
     kernel!(tendNormalVelocity,
             ssh,
@@ -56,6 +60,6 @@ end
   
     for k in 1:maxLevelEdgeTop[iEdge]
         # gradient on edges calculation 
-        tendency[k, iEdge] -= 9.80616 * InvDcEdge * (ssh[jCell2,2] - ssh[jCell1,2])
+        tendency[k, iEdge] -= 9.80616 * InvDcEdge * (ssh[jCell2] - ssh[jCell1])
     end
 end
