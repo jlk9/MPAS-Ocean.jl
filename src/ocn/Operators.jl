@@ -221,3 +221,12 @@ end
 
     @synchronize()
 end
+
+# Zeros out a vector along its entire length
+@kernel function ZeroOutVector!(tendNormalVelocity, length)
+    j = @index(Global, Linear)
+    if j < length + 1
+        tendNormalVelocity[1, j] = 0.0
+    end
+    @synchronize()
+end

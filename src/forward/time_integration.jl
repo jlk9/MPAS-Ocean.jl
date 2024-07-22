@@ -164,6 +164,8 @@ function ocn_timestep(Prog::PrognosticVars,
     
     # convert the timestep to seconds 
     dt = convert(Float64, Dates.value(Second(Clock.timeStep)))
+    @show dt
+    @show typeof(dt)
     
     # unpack the state variable arrays 
     @unpack ssh, normalVelocity, layerThickness = Prog
@@ -174,15 +176,21 @@ function ocn_timestep(Prog::PrognosticVars,
     # compute normalVelocity tenedency 
     computeNormalVelocityTendency!(Tend, Prog, Diag, Mesh, Config;
                                    backend = backend)
-    #=
+    
     # compute layerThickness tendency
     computeLayerThicknessTendency!(Tend, Prog, Diag, Mesh, Config;
                                    backend = backend)
-
+    
     # unpack the tendency variable arrays 
     @unpack tendNormalVelocity, tendLayerThickness = Tend 
     
-    # update the state variables by the tendencies 
+    # update the state variables by the tendencies
+    nthreads = 50
+    tendKernel! = UpdateStateVariable!(backend, nthreads)
+
+    tendKernel!(normalVelocity[end], tendNormalVelocity, dt, Mesh.HorzMesh.Edges.nEdges, ndrange=Mesh.HorzMesh.Edges.nEdges)
+    tendKernel!(layerThickness[end], tendLayerThickness, dt, Mesh.HorzMesh.PrimaryCells.nCells, ndrange=Mesh.HorzMesh.PrimaryCells.nCells)
+    #=
     normalVelocity[:,:,end] .+= dt .* tendNormalVelocity
     layerThickness[:,:,end] .+= dt .* tendLayerThickness
     
@@ -196,6 +204,15 @@ function ocn_timestep(Prog::PrognosticVars,
     @pack! Prog = ssh, normalVelocity, layerThickness
     
 end 
+
+# Zeros out a vector along its entire length
+@kernel function UpdateStateVariable!(var, @Const(tendVar), @Const(dt), length)
+    j = @index(Global, Linear)
+    if j < length + 1
+        var[1,j] += dt * tendVar[1, j]
+    end
+    @synchronize()
+end
 
 
 @kernel function subtract_array_from_end(ssh, @Const(restingThicknessSum))

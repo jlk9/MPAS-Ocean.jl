@@ -4,6 +4,8 @@ using MOKA
 using Statistics
 using KernelAbstractions
 
+using CUDA: @allowscalar
+
 using Enzyme
 
 # Might need to remove these:
@@ -34,6 +36,10 @@ function ocn_run(config_fp)
     clock, simulationAlarm, outputAlarm = ocn_init_alarms(Setup)
     println("Initialized the clock.")
     
+    dt = convert(Float64, Dates.value(Second(Setup.timeManager.timeStep)))
+
+    @show dt
+
     ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
 
     #
@@ -63,6 +69,11 @@ function ocn_run_with_ad(config_fp)
     # Initialize the Model  
     Setup, Diag, Tend, Prog             = ocn_init(config_fp, backend = backend)
     clock, simulationAlarm, outputAlarm = ocn_init_alarms(Setup)
+
+    dt_entry = convert(Float64, Dates.value(Second(Setup.timeManager.timeStep)))
+    dt = KA.zeros(backend, Float64, (1,))
+    @allowscalar dt[1] = dt_entry
+    @show dt
 
     #
     # Actual Model Run with AD
