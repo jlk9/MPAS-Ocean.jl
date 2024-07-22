@@ -4,7 +4,7 @@ export computeNormalVelocityTendency!
 
 using UnPack
 using KernelAbstractions
-using MOKA: TendencyVars, PrognosticVars, DiagnosticVars, Mesh, GlobalConfig
+using MOKA: TendencyVars, PrognosticVars, DiagnosticVars, Mesh, GlobalConfig, ZeroOutVector!
 
 #const KA = KernelAbstractions
 
@@ -25,13 +25,8 @@ function computeNormalVelocityTendency!(Tend::TendencyVars,
                                         Config::GlobalConfig;
                                         backend = CUDABackend())
     
-    # WARNING: this is not performant and should be fixed
     nthreads = 50
-    kernel! = zeroNormalVelocityTendency(backend, nthreads)
-
-    #@show size(Tend.tendNormalVelocity)
-    #@show Mesh.HorzMesh.Edges.nEdges
-    #@show Tend.tendNormalVelocity
+    kernel! = ZeroOutVector!(backend, nthreads)
     kernel!(Tend.tendNormalVelocity, Mesh.HorzMesh.Edges.nEdges, ndrange=Mesh.HorzMesh.Edges.nEdges)
 
     #=
@@ -56,31 +51,5 @@ function computeNormalVelocityTendency!(Tend::TendencyVars,
         Tend, Prog, Diag, Mesh, coriolisType; backend = backend
        )
 end
-
-
-@kernel function zeroNormalVelocityTendency(tendNormalVelocity, length)
-    j = @index(Global, Linear)
-    if j < length + 1
-        tendNormalVelocity[1, j] = 0.0
-    end
-    @synchronize()
-end
-
-
-#=
-# WARNING: this is not performant and should be fixed
-Tend.tendNormalVelocity .= 0.0
-
-nthreads = 50
-kernel! = zeroNormalVelocityTendency(backend, nthreads)
-
-kernel!(Tend.tendNormalVelocity, ndrange=Mesh.HorzMesh.Edges.nEdges)
-
-@kernel function zeroNormalVelocityTendency(tendNormalVelocity)
-    j = @index(Global, Linear)
-    k = 1
-    @inbound tendNormalVelocity[k, j] = 0
-end
-=#
 
 end

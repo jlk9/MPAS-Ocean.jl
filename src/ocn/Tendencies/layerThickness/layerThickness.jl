@@ -5,7 +5,7 @@ export computeLayerThicknessTendency!
 using UnPack
 using KernelAbstractions 
 using CUDA: @allowscalar
-using MOKA: TendencyVars, PrognosticVars, DiagnosticVars, Mesh, GlobalConfig
+using MOKA: TendencyVars, PrognosticVars, DiagnosticVars, Mesh, GlobalConfig, ZeroOutVector!
 
 const KA = KernelAbstractions
 
@@ -18,8 +18,9 @@ function computeLayerThicknessTendency!(Tend::TendencyVars,
                                         Config::GlobalConfig;
                                         backend = KA.CPU())
 
-    # WARNING: this is not performant and should be fixed
-    Tend.tendLayerThickness .= 0.0
+    nthreads = 50
+    kernel! = ZeroOutVector!(backend, nthreads)
+    kernel!(Tend.tendLayerThickness, Mesh.HorzMesh.PrimaryCells.nCells, ndrange=Mesh.HorzMesh.PrimaryCells.nCells)
 
     # compute horizontal advection of layer thickness
     horizontal_advection_tendency!(

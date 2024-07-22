@@ -11,7 +11,8 @@ module MOKA
     # Operators
     export GradientOnEdge!,
            DivergenceOnCell!, 
-           CurlOnVertex!
+           CurlOnVertex!,
+           ZeroOutVector!
     
 
     using Dates, YAML, NCDatasets, UnPack, Statistics, Logging, KernelAbstractions
