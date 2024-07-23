@@ -27,7 +27,7 @@ function horizontal_advection_and_coriolis_tendency!(Tend::TendencyVars,
     normalVelocity = Prog.normalVelocity[end]
     # unpack the normal velocity tendency term
     @unpack tendNormalVelocity = Tend 
-
+    
     # initialize the kernel
     nthreads = 50
     kernel!  = coriolis_force_tendency_kernel!(backend, nthreads)
@@ -42,7 +42,7 @@ function horizontal_advection_and_coriolis_tendency!(Tend::TendencyVars,
             ndrange = nEdges)
     # sync the backend 
     KA.synchronize(backend)
-
+    
     # pack the tendecy pack into the struct for further computation
     @pack! Tend = tendNormalVelocity
 end
@@ -68,7 +68,7 @@ end
 
         @inbounds for k in 1:maxLevelEdgeTop[iEdge]
             tendency[k,iEdge] += weightsOnEdge[i,iEdge] *
-                                 normalVelocity[k, eoe, 2] *
+                                 normalVelocity[k, eoe] *
                                  fᵉ[eoe]
         end
     end

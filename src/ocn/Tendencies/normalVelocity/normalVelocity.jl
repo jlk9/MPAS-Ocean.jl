@@ -28,14 +28,13 @@ function computeNormalVelocityTendency!(Tend::TendencyVars,
     nthreads = 50
     kernel! = ZeroOutVector!(backend, nthreads)
     kernel!(Tend.tendNormalVelocity, Mesh.HorzMesh.Edges.nEdges, ndrange=Mesh.HorzMesh.Edges.nEdges)
-
     #=
     # hard code the pressure gradient as SSH Gradient for now, in the future 
     # we will want some functionality to parse config (e.g.):
     #
     #       pGradType = parsing_function(Config)       
     =#       
-    pGradType = sshGradient 
+    pGradType = sshGradient
 
     # compute pressure gradient tendency on requested backend
     pressure_gradient_tendency!(
@@ -50,6 +49,7 @@ function computeNormalVelocityTendency!(Tend::TendencyVars,
     horizontal_advection_and_coriolis_tendency!(
         Tend, Prog, Diag, Mesh, coriolisType; backend = backend
        )
+    
 end
 
 end

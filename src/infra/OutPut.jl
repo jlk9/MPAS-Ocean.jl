@@ -7,6 +7,7 @@ function write_netcdf(Setup::ModelSetup,
     Mesh = Adapt.adapt_structure(KA.CPU(), Setup.mesh)
     Diag = Adapt.adapt_structure(KA.CPU(), Diag)
     Prog = Adapt.adapt_structure(KA.CPU(), Prog)
+    d_Prog = Adapt.adapt_structure(KA.CPU(), d_Prog)
 
     clock = Setup.timeManager
     config = Setup.config
@@ -97,13 +98,18 @@ function write_netcdf(Setup::ModelSetup,
     #verticesOnCell[:,:] = mesh.HorzMesh.PrimaryCells.VoC
     #verticesOnEdge[:,:] = mesh.HorzMesh.Edges.VoE
     
-    ssh[:,:] = Prog.ssh[:,end]
-    layerThickness[:,:,:] = Prog.layerThickness[:,:,end] 
-    normalVelocity[:,:,:] = Prog.normalVelocity[:,:,end]
+    @show Prog.ssh[end]
+    @show d_Prog.ssh[end]
 
-    d_ssh[:,:] = d_Prog.ssh[:,end]
-    d_layerThickness[:,:,:] = d_Prog.layerThickness[:,:,end] 
-    d_normalVelocity[:,:,:] = d_Prog.normalVelocity[:,:,end]
+    @show typeof(Prog.ssh[end]), typeof(d_Prog.ssh[end])
+
+    ssh[:,:] = Prog.ssh[end]
+    layerThickness[:,:,:] = Prog.layerThickness[end] 
+    normalVelocity[:,:,:] = Prog.normalVelocity[end]
+
+    d_ssh[:,:] = d_Prog.ssh[end]
+    d_layerThickness[:,:,:] = d_Prog.layerThickness[end] 
+    d_normalVelocity[:,:,:] = d_Prog.normalVelocity[end]
 
     close(ds)
 end

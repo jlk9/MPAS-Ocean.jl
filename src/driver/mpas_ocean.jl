@@ -35,12 +35,10 @@ function ocn_run(config_fp)
     println("Initialized the model")
     clock, simulationAlarm, outputAlarm = ocn_init_alarms(Setup)
     println("Initialized the clock.")
-    
-    dt = convert(Float64, Dates.value(Second(Setup.timeManager.timeStep)))
+    timestep = KA.zeros(backend, Float64, (1,))
+    @allowscalar timestep[1] = convert(Float64, Dates.value(Second(Setup.timeManager.timeStep)))
 
-    @show dt
-
-    ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
+    ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
 
     #
     # Writing to outputs
@@ -70,10 +68,10 @@ function ocn_run_with_ad(config_fp)
     Setup, Diag, Tend, Prog             = ocn_init(config_fp, backend = backend)
     clock, simulationAlarm, outputAlarm = ocn_init_alarms(Setup)
 
-    dt_entry = convert(Float64, Dates.value(Second(Setup.timeManager.timeStep)))
-    dt = KA.zeros(backend, Float64, (1,))
-    @allowscalar dt[1] = dt_entry
-    @show dt
+    timestep   = KA.zeros(backend, Float64, (1,))
+    d_timestep = KA.zeros(backend, Float64, (1,))
+    @allowscalar timestep[1] = convert(Float64, Dates.value(Second(Setup.timeManager.timeStep)))
+    @show timestep, d_timestep
 
     #
     # Actual Model Run with AD
@@ -90,6 +88,7 @@ function ocn_run_with_ad(config_fp)
 
     d_sum = autodiff(Enzyme.Reverse,
              ocn_run_loop,
+             Duplicated(timestep, d_timestep),
              Duplicated(Prog, d_Prog),
              Duplicated(Diag, d_Diag),
              Duplicated(Tend, d_Tend),
@@ -154,10 +153,10 @@ function ocn_run_with_ad(config_fp)
     #
     # Writing to outputs
     #
-    
+    =#
     # Only suport i/o at the end of the simulation for now 
     write_netcdf(Setup, Diag, Prog, d_Prog)
-    =#
+    
     backend = get_backend(Tend.tendNormalVelocity)
     arch = typeof(backend) <: KA.GPU ? "GPU" : "CPU"
 
@@ -167,7 +166,7 @@ end
 
 # Helper function that runs the model "loop" without instantiating new memory or performing I/O.
 # This is what we call AD on. At the end we also sum up the squared SSH for testing purposes.
-function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=CUDABackend())
+function ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=CUDABackend())
     global i = 0
     # Run the model 
     while !isRinging(simulationAlarm)
@@ -175,8 +174,8 @@ function ocn_run_loop(Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAl
         advance!(clock)
     
         global i += 1
-    
-        ocn_timestep(Prog, Diag, Tend, Setup, ForwardEuler; backend=backend)
+        @show i
+        ocn_timestep(timestep, Prog, Diag, Tend, Setup, ForwardEuler; backend=backend)
         
         if isRinging(outputAlarm)
             # should be doing i/o in here, using a i/o struct... unless we want to apply AD

@@ -148,7 +148,8 @@ function ocn_timestep(Prog::PrognosticVars,
     diagnostic_compute!(Mesh, Diag, Prog)
 end 
 
-function ocn_timestep(Prog::PrognosticVars, 
+function ocn_timestep(timestep,
+                      Prog::PrognosticVars, 
                       Diag::DiagnosticVars,
                       Tend::TendencyVars, 
                       S::ModelSetup,
@@ -162,17 +163,17 @@ function ocn_timestep(Prog::PrognosticVars,
     # advance the timelevels within the state strcut 
     advanceTimeLevels!(Prog; backend=backend)
     
-    # convert the timestep to seconds 
-    dt = convert(Float64, Dates.value(Second(Clock.timeStep)))
-    @show dt
-    @show typeof(dt)
-    
     # unpack the state variable arrays 
     @unpack ssh, normalVelocity, layerThickness = Prog
     
     # compute the diagnostics
     diagnostic_compute!(Mesh, Diag, Prog; backend = backend)
     
+    #@show Diag.layerThicknessEdge[10:20]
+    #@show Diag.thicknessFlux[1037:1047]
+    #@show Diag.velocityDivCell[2001:2011]
+    #@show Diag.relativeVorticity[13:23]
+
     # compute normalVelocity tenedency 
     computeNormalVelocityTendency!(Tend, Prog, Diag, Mesh, Config;
                                    backend = backend)
@@ -182,43 +183,44 @@ function ocn_timestep(Prog::PrognosticVars,
                                    backend = backend)
     
     # unpack the tendency variable arrays 
-    @unpack tendNormalVelocity, tendLayerThickness = Tend 
+    @unpack tendNormalVelocity, tendLayerThickness = Tend
+
+    #@show Tend.tendNormalVelocity[5123:5125]
+    #@show Tend.tendLayerThickness[2123:2125]
     
     # update the state variables by the tendencies
     nthreads = 50
     tendKernel! = UpdateStateVariable!(backend, nthreads)
 
-    tendKernel!(normalVelocity[end], tendNormalVelocity, dt, Mesh.HorzMesh.Edges.nEdges, ndrange=Mesh.HorzMesh.Edges.nEdges)
-    tendKernel!(layerThickness[end], tendLayerThickness, dt, Mesh.HorzMesh.PrimaryCells.nCells, ndrange=Mesh.HorzMesh.PrimaryCells.nCells)
+    tendKernel!(normalVelocity[end], tendNormalVelocity, timestep, Mesh.HorzMesh.Edges.nEdges, ndrange=Mesh.HorzMesh.Edges.nEdges)
+    tendKernel!(layerThickness[end], tendLayerThickness, timestep, Mesh.HorzMesh.PrimaryCells.nCells, ndrange=Mesh.HorzMesh.PrimaryCells.nCells)
+
+    @show tendLayerThickness[1,1298:1300]
+    @show layerThickness[end][1,1298:1300]
     #=
-    normalVelocity[:,:,end] .+= dt .* tendNormalVelocity
-    layerThickness[:,:,end] .+= dt .* tendLayerThickness
-    
-    ssh[:,end] = Prog.layerThickness[1,:,end]
+    ssh_length = size(ssh[end])[1]
 
-    ssh_length = size(Prog.ssh)[1]
-
-    kernel! = subtract_array_from_end(backend)
-    kernel!(ssh, Mesh.VertMesh.restingThicknessSum, workgroupsize=64, ndrange=ssh_length)
+    kernel! = Update_ssh!(backend, nthreads)
+    kernel!(ssh[end], Prog.layerThickness[end], Mesh.VertMesh.restingThicknessSum, ssh_length, ndrange=ssh_length)
     =#
     @pack! Prog = ssh, normalVelocity, layerThickness
-    
-end 
+end
 
 # Zeros out a vector along its entire length
 @kernel function UpdateStateVariable!(var, @Const(tendVar), @Const(dt), length)
     j = @index(Global, Linear)
     if j < length + 1
-        var[1,j] += dt * tendVar[1, j]
+        var[1,j] = var[1,j] + dt[1] * tendVar[1, j]
     end
     @synchronize()
 end
 
 
-@kernel function subtract_array_from_end(ssh, @Const(restingThicknessSum))
+@kernel function Update_ssh!(ssh, @Const(layerThickness), @Const(restingThicknessSum), length)
 
     j = @index(Global, Linear)
-
-    @inbounds ssh[j,end] = ssh[j,end] - restingThicknessSum[j]
+    if j < length + 1
+        @inbounds ssh[j] = layerThickness[1,j] - restingThicknessSum[j]
+    end
     @synchronize()
 end

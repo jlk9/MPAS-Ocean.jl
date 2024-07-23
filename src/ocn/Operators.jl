@@ -9,13 +9,13 @@ using KernelAbstractions
                                        n_{\rm e,i} F_{\rm e} l_{\rm e}
 ```
 """
-@kernel function DivergenceOnCell_P1(VecEdge, @Const(dvEdge), length)
+@kernel function DivergenceOnCell_P1(temp, @Const(VecEdge), @Const(dvEdge), length)
 
     #iEdge, k = @index(Global, NTuple)
     iEdge = @index(Global, Linear)
     k = 1
     if iEdge < length + 1
-        @inbounds VecEdge[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
+        @inbounds temp[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
     end
     @synchronize()
 end
@@ -43,8 +43,8 @@ end
     @synchronize()
 end
 
-function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=CUDABackend())
-
+function DivergenceOnCell!(DivCell, VecEdge, temp, Mesh::Mesh; backend=CUDABackend())
+    
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack PrimaryCells, DualCells, Edges = HorzMesh
     
@@ -56,14 +56,15 @@ function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=CUDABackend())
     nthreads = 50
     kernel1! = DivergenceOnCell_P1(backend, nthreads)
     kernel2! = DivergenceOnCell_P2(backend, nthreads)
-
+    
     # TODO: Add workgroupsize(s) as kwarg. As named tuple:
     #       DivergenceOnCell!(...; workgroupsizes=(P1 = 64, P2 = 32))
     #kernel1!(VecEdge, dvEdge, ndrange=(nEdges, nVertLevels))
-    kernel1!(VecEdge, dvEdge, nEdges, ndrange=nEdges)
 
+    kernel1!(temp, VecEdge, dvEdge, nEdges, ndrange=nEdges)
+    
     kernel2!(DivCell,
-             VecEdge,
+             temp,
              nEdgesOnCell,
              edgesOnCell,
              edgeSignOnCell,
@@ -72,6 +73,7 @@ function DivergenceOnCell!(DivCell, VecEdge, Mesh::Mesh; backend=CUDABackend())
              ndrange=(nCells, nVertLevels))
 
     KA.synchronize(backend)
+    
 end
 
 @doc raw"""
