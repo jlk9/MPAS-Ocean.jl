@@ -177,11 +177,17 @@ function calculate_velocityDivCell!(Diag::DiagnosticVars,
                                     Mesh::Mesh;
                                     backend = KA.CPU()) 
     
-    #normalVelocity = Prog.normalVelocity[:,:,end]
+    normalVelocity = Prog.normalVelocity[end]
 
-    @unpack velocityDivCell = Diag 
+    # I think the issue is that this doesn't create a new array while the old version does... we need a
+    # new array for temporary data
 
-    DivergenceOnCell!(velocityDivCell, Prog.normalVelocity[end], Mesh; backend=backend)
+    # layerThicknessEdge is used here to temporarily store intermdeiate results. It will be reset when it is acually
+    # used as a diagnostic variable
+    @unpack velocityDivCell, layerThicknessEdge = Diag
+
+
+    DivergenceOnCell!(velocityDivCell, normalVelocity, layerThicknessEdge, Mesh; backend=backend)
 
     @pack! Diag = velocityDivCell
 end
