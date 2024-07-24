@@ -63,6 +63,7 @@ end
         for k in 1:maxLevelEdgeTop[iEdge]
             tendency[k,iCell] += thicknessFlux[k,iEdge] * dvEdge[iEdge] *
                                  edgeSignOnCell[i,iCell] * invArea
+            #tendency[k,iCell] = thicknessFlux[k,iEdge]
         end
     end
 end

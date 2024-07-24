@@ -98,10 +98,10 @@ function write_netcdf(Setup::ModelSetup,
     #verticesOnCell[:,:] = mesh.HorzMesh.PrimaryCells.VoC
     #verticesOnEdge[:,:] = mesh.HorzMesh.Edges.VoE
     
-    @show Prog.ssh[end]
-    @show d_Prog.ssh[end]
+    #@show Prog.ssh[end]
+    #@show d_Prog.ssh[end]
 
-    @show typeof(Prog.ssh[end]), typeof(d_Prog.ssh[end])
+    #@show typeof(Prog.ssh[end]), typeof(d_Prog.ssh[end])
 
     ssh[:,:] = Prog.ssh[end]
     layerThickness[:,:,:] = Prog.layerThickness[end] 
@@ -182,9 +182,9 @@ function write_netcdf(Setup::ModelSetup,
     verticesOnEdge = defVar(ds,"verticesOnEdge",Int32,("TWO","nEdges"))
 
     # Define the data variables 
-    ssh = defVar(ds,"ssh",Float64,("nCells","time"))
-    layerThickness = defVar(ds,"layerThickness",Float64,("nCells","nVertLevels","time"))
-    normalVelocity = defVar(ds,"normalVelocity",Float64,("nEdges","nVertLevels","time"))
+    ssh = defVar(ds,"ssh",Float64,("nCells",))
+    layerThickness = defVar(ds,"layerThickness",Float64,("nCells","nVertLevels"))
+    normalVelocity = defVar(ds,"normalVelocity",Float64,("nEdges","nVertLevels"))
 
     # dump the variables into the dataset. 
     xtime[:] = Dates.value(Second(clock.currTime - clock.startTime))
@@ -207,9 +207,9 @@ function write_netcdf(Setup::ModelSetup,
     #verticesOnCell[:,:] = mesh.HorzMesh.PrimaryCells.VoC
     #verticesOnEdge[:,:] = mesh.HorzMesh.Edges.VoE
 
-    ssh[:,:] = Prog.ssh[end]
-    layerThickness[:,:,:] = Prog.layerThickness[end] 
-    normalVelocity[:,:,:] = Prog.normalVelocity[end]
+    ssh[:] = Prog.ssh[end]
+    layerThickness[:,:] = Prog.layerThickness[end]
+    normalVelocity[:,:] = Prog.normalVelocity[end]
 
     close(ds)
 end

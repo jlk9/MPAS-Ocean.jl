@@ -40,6 +40,12 @@ function ocn_run(config_fp)
 
     ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
 
+    #@show Prog.normalVelocity[end]
+    #@show sum(Prog.normalVelocity[end]) / size(Prog.normalVelocity[end])[2]
+
+    #@show Prog.layerThickness[end]
+    #@show sum(Prog.layerThickness[end] .* Prog.layerThickness[end]) / size(Prog.layerThickness[end])[2]
+
     #
     # Writing to outputs
     #
@@ -176,6 +182,8 @@ function ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, si
         global i += 1
         @show i
         ocn_timestep(timestep, Prog, Diag, Tend, Setup, ForwardEuler; backend=backend)
+
+        #@show Diag.thicknessFlux[1:3]
         
         if isRinging(outputAlarm)
             # should be doing i/o in here, using a i/o struct... unless we want to apply AD
