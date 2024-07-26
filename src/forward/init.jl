@@ -29,6 +29,16 @@ function ocn_init(Config_filepath; backend=KA.CPU())
     return Setup, Diag, Tend, Prog
 end 
 
+function ocn_init_shadows(Prog, Diag, Tend; backend=KA.CPU())
+
+    d_Prog = PrognosticVars(zeros(Float64, size(Prog.ssh)),
+                            zeros(Float64, size(Prog.normalVelocity)),
+                            zeros(Float64, size(Prog.layerThickness)),
+                            1)
+
+    return d_Prog
+end
+
 
 function ocn_setup_mesh(Config::GlobalConfig; backend=KA.CPU())
     # get mesh section of the streams file

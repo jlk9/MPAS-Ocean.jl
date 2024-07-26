@@ -182,16 +182,13 @@ function ocn_timestep(timestep,
     computeLayerThicknessTendency!(Tend, Prog, Diag, Mesh, Config;
                                    backend = backend)
     
-    # unpack the tendency variable arrays 
-    @unpack tendNormalVelocity, tendLayerThickness = Tend
-    
     # update the state variables by the tendencies
     nthreads = 50
     tendKernel! = UpdateStateVariable!(backend, nthreads)
 
-    tendKernel!(normalVelocity[end], tendNormalVelocity, timestep, Mesh.HorzMesh.Edges.nEdges, ndrange=Mesh.HorzMesh.Edges.nEdges)
-    tendKernel!(layerThickness[end], tendLayerThickness, timestep, Mesh.HorzMesh.PrimaryCells.nCells, ndrange=Mesh.HorzMesh.PrimaryCells.nCells)
-
+    tendKernel!(normalVelocity[end], Tend.tendNormalVelocity, timestep, Mesh.HorzMesh.Edges.nEdges, ndrange=Mesh.HorzMesh.Edges.nEdges)
+    tendKernel!(layerThickness[end], Tend.tendLayerThickness, timestep, Mesh.HorzMesh.PrimaryCells.nCells, ndrange=Mesh.HorzMesh.PrimaryCells.nCells)
+    
     #@show Tend.tendNormalVelocity[1,5123:5125]
     #@show normalVelocity[end][1,5123:5125]
 
@@ -204,6 +201,7 @@ function ocn_timestep(timestep,
     kernel!(ssh[end], Prog.layerThickness[end], Mesh.VertMesh.restingThicknessSum, ssh_length, ndrange=ssh_length)
     
     @pack! Prog = ssh, normalVelocity, layerThickness
+    
 end
 
 # Zeros out a vector along its entire length

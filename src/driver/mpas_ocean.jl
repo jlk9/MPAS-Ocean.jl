@@ -76,6 +76,11 @@ function ocn_run_with_ad(config_fp)
 
     timestep   = KA.zeros(backend, Float64, (1,))
     d_timestep = KA.zeros(backend, Float64, (1,))
+    sumGPU     = KA.zeros(backend, Float64, (1,))
+    d_sumGPU   = KA.zeros(backend, Float64, (1,))
+
+    sumCPU   = zeros(Float64, (1,))
+    d_sumCPU = zeros(Float64, (1,))
     @allowscalar timestep[1] = convert(Float64, Dates.value(Second(Setup.timeManager.timeStep)))
     @show timestep, d_timestep
 
@@ -84,18 +89,39 @@ function ocn_run_with_ad(config_fp)
     #
 
     d_Prog = Enzyme.make_zero(Prog)
+    for i = 1:2
+        d_Prog.normalVelocity[i] = KA.zeros(backend, Float64, size(d_Prog.normalVelocity[i]))
+        d_Prog.layerThickness[i] = KA.zeros(backend, Float64, size(d_Prog.layerThickness[i]))
+        d_Prog.ssh[i] = KA.zeros(backend, Float64, size(d_Prog.ssh[i]))
+    end
+
     d_Diag = Enzyme.make_zero(Diag)
+    d_Diag.layerThicknessEdge = KA.zeros(backend, Float64, size(d_Diag.layerThicknessEdge))
+    d_Diag.thicknessFlux      = KA.zeros(backend, Float64, size(d_Diag.thicknessFlux))
+    d_Diag.velocityDivCell    = KA.zeros(backend, Float64, size(d_Diag.velocityDivCell))
+    d_Diag.relativeVorticity  = KA.zeros(backend, Float64, size(d_Diag.relativeVorticity))
+
     d_Tend = Enzyme.make_zero(Tend)
+    d_Tend.tendNormalVelocity = KA.zeros(backend, Float64, size(d_Tend.tendNormalVelocity))
+    d_Tend.tendLayerThickness = KA.zeros(backend, Float64, size(d_Tend.tendLayerThickness))
+
     d_Setup = Enzyme.make_zero(Setup)
     d_ForwardEuler = Enzyme.make_zero(ForwardEuler)
     d_clock = Enzyme.make_zero(clock)
     d_simulationAlarm = Enzyme.make_zero(simulationAlarm)
     d_outputAlarm = Enzyme.make_zero(outputAlarm)
 
-    @allowscalar d_Prog.ssh[end][1] = 1.0
+    #@allowscalar d_Prog.ssh[end][1] = 1.0
 
+    #@show d_Prog
+    #@show typeof(d_Prog.normalVelocity), typeof(Prog.normalVelocity)
+    @allowscalar d_Prog.layerThickness[end][1,1] = 1.0
+
+    
     d_sum = autodiff(Enzyme.Reverse,
              ocn_run_loop,
+             Duplicated(sumCPU, d_sumCPU),
+             Duplicated(sumGPU, d_sumGPU),
              Duplicated(timestep, d_timestep),
              Duplicated(Prog, d_Prog),
              Duplicated(Diag, d_Diag),
@@ -114,8 +140,10 @@ function ocn_run_with_ad(config_fp)
 
     println("For cell number")
     #@allowscalar @show k, d_Prog.layerThickness[end][1,k], d_Prog.normalVelocity[end][1,k]
-    @show d_Prog.layerThickness
-    @show d_sum
+    @show d_Prog
+    #@show d_Diag.velocityDivCell
+    #@show d_Tend.tendLayerThickness
+    #@show d_sum
     #=
     for ϵ in ϵ_range
         SetupP, DiagP, TendP, ProgP            = ocn_init(config_fp, backend = backend)
@@ -127,16 +155,19 @@ function ocn_run_with_ad(config_fp)
         @allowscalar ProgP.layerThickness[end][1,k] = ProgP.layerThickness[end][1,k] + abs(ProgP.layerThickness[end][1,k]) * ϵ
         @allowscalar ProgM.layerThickness[end][1,k] = ProgM.layerThickness[end][1,k] - abs(ProgM.layerThickness[end][1,k]) * ϵ
         
-        @allowscalar dist = ProgP.layerThickness[1,k,end] - ProgM.layerThickness[1,k,end]
+        @allowscalar dist = ProgP.layerThickness[end][1,k] - ProgM.layerThickness[end][1,k]
 
-        sumP = ocn_run_loop(ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
-        sumM = ocn_run_loop(ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
+        sumP = ocn_run_loop(timestep, ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
+        sumM = ocn_run_loop(timestep, ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
+
+        @show sumP, sumM
+        @show dist
 
         d_firstlayer_fd = (sumP - sumM) / dist
 
         @show ϵ, d_firstlayer_fd
     end
-    @show d_Prog.layerThickness[end][1,k]
+    @allowscalar @show d_Prog.layerThickness[end][1,k]
 
     # For normal velocity:
     for ϵ in ϵ_range
@@ -151,14 +182,14 @@ function ocn_run_with_ad(config_fp)
         
         @allowscalar dist = ProgP.normalVelocity[end][1,k] - ProgM.normalVelocity[end][1,k]
 
-        sumP = ocn_run_loop(ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
-        sumM = ocn_run_loop(ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
+        sumP = ocn_run_loop(timestep, ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
+        sumM = ocn_run_loop(timestep, ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
 
         d_firstvelocity_fd = (sumP - sumM) / dist
 
         @show ϵ, d_firstvelocity_fd
     end
-    @show d_Prog.normalVelocity[end][1,k]
+    @allowscalar @show d_Prog.normalVelocity[end][1,k]
     =#
     #
     # Writing to outputs
@@ -176,7 +207,7 @@ end
 
 # Helper function that runs the model "loop" without instantiating new memory or performing I/O.
 # This is what we call AD on. At the end we also sum up the squared SSH for testing purposes.
-function ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=CUDABackend())
+function ocn_run_loop(sumCPU, sumGPU, timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=CUDABackend())
     global i = 0
     # Run the model 
     while !isRinging(simulationAlarm)
@@ -194,23 +225,26 @@ function ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, si
         end
     end
 
-    sum = 0.0
+    
+    #sum = 0.0
+    
     #=
     ssh_length = size(Prog.ssh)[1]
     for j = 1:ssh_length
-        sum = sum + Prog.ssh[j,2]^2
+        @allowscalar sum = sum + Prog.ssh[end][j]^2
     end
     =#
+    
     sumKernel! = sumArray(backend, 1)
-    sumKernel!(Prog.ssh[end], size(Prog.ssh)[1], ndrange=1)
+    sumKernel!(sumGPU, Prog.ssh[end], size(Prog.ssh)[1], ndrange=1)
 
-    return sum
+    #copyto!(sumCPU, sumGPU)
+    #return sumCPU[1]
 end
 
-@kernel function sumArray(array, length)
-    array[1] = array[1]*array[1]
-    for j = 2:length
-        array[1] = array[1] + array[j]*array[j]
+@kernel function sumArray(sumGPU, @Const(array), length)
+    for j = 1:length
+        sumGPU[1] = sumGPU[1] + array[j]*array[j]
     end
 end
 
