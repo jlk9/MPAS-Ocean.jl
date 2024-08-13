@@ -27,9 +27,9 @@ end
                                      @Const(edgeSignOnCell),
                                      @Const(areaCell)) #::Val{n}, where {n}
 
-    iCell, k = @index(Global, NTuple)
-    #iCell = @index(Global, Linear)
-    #k = 1
+    #iCell, k = @index(Global, NTuple)
+    iCell = @index(Global, Linear)
+    k = 1
 
     DivCell[k,iCell] = 0.0
 
@@ -43,7 +43,7 @@ end
     @synchronize()
 end
 
-function DivergenceOnCell!(DivCell, VecEdge, temp, Mesh::Mesh; backend=CUDABackend())
+function DivergenceOnCell!(DivCell, VecEdge, temp, Mesh::Mesh; backend=CUDABackend(), nthreads=50)
     
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack PrimaryCells, DualCells, Edges = HorzMesh
@@ -53,7 +53,7 @@ function DivergenceOnCell!(DivCell, VecEdge, temp, Mesh::Mesh; backend=CUDABacke
     @unpack nCells, nEdgesOnCell = PrimaryCells
     @unpack edgesOnCell, edgeSignOnCell, areaCell = PrimaryCells
     
-    nthreads = 50
+    #nthreads = 50
     kernel1! = DivergenceOnCell_P1(backend, nthreads)
     kernel2! = DivergenceOnCell_P2(backend, nthreads)
     
@@ -69,8 +69,8 @@ function DivergenceOnCell!(DivCell, VecEdge, temp, Mesh::Mesh; backend=CUDABacke
              edgesOnCell,
              edgeSignOnCell,
              areaCell,
-             #ndrange=nCells)
-             ndrange=(nCells, nVertLevels))
+             ndrange=nCells)
+             #ndrange=(nCells, nVertLevels))
 
     KA.synchronize(backend)
     
