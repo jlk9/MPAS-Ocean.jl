@@ -318,9 +318,9 @@ version = "0.189.0+1"
 
 [[deps.Enzyme]]
 deps = ["CEnum", "EnzymeCore", "Enzyme_jll", "GPUCompiler", "LLVM", "Libdl", "LinearAlgebra", "ObjectFile", "Preferences", "Printf", "Random"]
-git-tree-sha1 = "d182ebea02378543ebf83397d42c22e2e5fb4645"
+git-tree-sha1 = "80135c32f09f1c3d683f9826f695762e8f3f8eba"
 uuid = "7da242da-08ed-463a-9acd-ee780be4f1d9"
-version = "0.12.26"
+version = "0.12.27"
 
     [deps.Enzyme.extensions]
     EnzymeChainRulesCoreExt = "ChainRulesCore"
@@ -345,9 +345,9 @@ weakdeps = ["Adapt"]
 
 [[deps.Enzyme_jll]]
 deps = ["Artifacts", "JLLWrappers", "LazyArtifacts", "Libdl", "TOML"]
-git-tree-sha1 = "b5084294bdbdbb2cf1f102bc399872fcebc7e887"
+git-tree-sha1 = "df8ae13c09f187dbb395bd4908c6e097b683f480"
 uuid = "7cc45869-7501-5eee-bdea-0790c847d4ef"
-version = "0.0.140+0"
+version = "0.0.141+0"
 
 [[deps.EpollShim_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]

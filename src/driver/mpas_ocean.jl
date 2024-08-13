@@ -40,12 +40,6 @@ function ocn_run(config_fp)
 
     ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=backend)
 
-    #@show Prog.normalVelocity[end]
-    #@show sum(Prog.normalVelocity[end]) / size(Prog.normalVelocity[end])[2]
-
-    #@show Prog.layerThickness[end]
-    #@show sum(Prog.layerThickness[end] .* Prog.layerThickness[end]) / size(Prog.layerThickness[end])[2]
-
     #
     # Writing to outputs
     #
@@ -120,8 +114,8 @@ function ocn_run_with_ad(config_fp)
     
     d_sum = autodiff(Enzyme.Reverse,
              ocn_run_loop,
-             Duplicated(sumCPU, d_sumCPU),
-             Duplicated(sumGPU, d_sumGPU),
+             #Duplicated(sumCPU, d_sumCPU),
+             #Duplicated(sumGPU, d_sumGPU),
              Duplicated(timestep, d_timestep),
              Duplicated(Prog, d_Prog),
              Duplicated(Diag, d_Diag),
@@ -207,7 +201,7 @@ end
 
 # Helper function that runs the model "loop" without instantiating new memory or performing I/O.
 # This is what we call AD on. At the end we also sum up the squared SSH for testing purposes.
-function ocn_run_loop(sumCPU, sumGPU, timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=CUDABackend())
+function ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=CUDABackend())
     global i = 0
     # Run the model 
     while !isRinging(simulationAlarm)
@@ -233,11 +227,11 @@ function ocn_run_loop(sumCPU, sumGPU, timestep, Prog, Diag, Tend, Setup, Forward
     for j = 1:ssh_length
         @allowscalar sum = sum + Prog.ssh[end][j]^2
     end
-    =#
+    
     
     sumKernel! = sumArray(backend, 1)
     sumKernel!(sumGPU, Prog.ssh[end], size(Prog.ssh)[1], ndrange=1)
-
+    =#
     #copyto!(sumCPU, sumGPU)
     #return sumCPU[1]
 end

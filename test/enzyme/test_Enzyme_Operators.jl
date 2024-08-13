@@ -53,7 +53,8 @@ d_gradNum  = KA.zeros(backend, Float64, (nVertLevels, nEdges))
 d_Scalar   = KA.zeros(backend, eltype(setup.xᶜ), (nVertLevels, nCells))
 d_MPASMesh = Enzyme.make_zero(MPASMesh)
 
-@allowscalar d_gradNum[1] = 1.0
+kEnd = 1
+@allowscalar d_gradNum[kEnd] = 1.0
 
 d_normSq = autodiff(Enzyme.Reverse,
                     gradient_test,
@@ -61,33 +62,38 @@ d_normSq = autodiff(Enzyme.Reverse,
                     Duplicated(Scalar, d_Scalar),
                     Duplicated(MPASMesh, d_MPASMesh))
 
-@show d_Scalar
+HorzMeshFD = ReadHorzMesh(mesh_fn; backend=backend)
+MPASMeshFD = Mesh(HorzMeshFD, VertMesh)
+kBegin = 1
+ϵ_range = [1e-1, 1e-2, 1e-3, 1e-4]#, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
+for ϵ in ϵ_range
 
+    # For comparison, let's compute the derivative by hand for a given scalar entry:
+    gradNumFD = KA.zeros(backend, Float64, (nVertLevels, nEdges))
+    ScalarFD  = h(setup, PlanarTest)
+    ScalarP = deepcopy(ScalarFD)
+    ScalarM = deepcopy(ScalarFD)
+    @allowscalar ScalarP[kBegin] = ScalarP[kBegin] + abs(ScalarP[kBegin]) * ϵ
+    @allowscalar ScalarM[kBegin] = ScalarM[kBegin] - abs(ScalarM[kBegin]) * ϵ
+
+    gradient_test(gradNumFD, ScalarP, MPASMeshFD)
+    @allowscalar normP = gradNumFD[kEnd]
+    gradNumFD = KA.zeros(backend, Float64, (nVertLevels, nEdges))
+    gradient_test(gradNumFD, ScalarM, MPASMeshFD)
+    @allowscalar normM = gradNumFD[kEnd]
+
+    @allowscalar dnorm_dscalar_fd = (normP - normM) / (ScalarP[kBegin] - ScalarM[kBegin])
+    @allowscalar dnorm_dscalar = d_Scalar[kEnd]
+
+    #@allowscalar @show normP, normM, ScalarP[k], ScalarM[k]
+
+    @info """ (gradients)\n
+    For edge global input $kBegin, output $kEnd
+    Enzyme computed $dnorm_dscalar
+    Finite differences computed $dnorm_dscalar_fd
+    """
+end
 #=
-# For comparison, let's compute the derivative by hand for a given scalar entry:
-gradNum = KA.zeros(backend, Float64, (nVertLevels, nEdges))
-Scalar  = h(setup, PlanarTest)
-ScalarP = deepcopy(Scalar)
-ScalarM = deepcopy(Scalar)
-
-ϵ = 0.1
-k = 1837
-ScalarP[k] = ScalarP[k] + abs(ScalarP[k]) * ϵ
-ScalarM[k] = ScalarM[k] - abs(ScalarM[k]) * ϵ
-
-normSqP = gradient_normSq(gradNum, ScalarP, MPASMesh)
-gradNum = KA.zeros(backend, Float64, (nVertLevels, nEdges))
-normSqM = gradient_normSq(gradNum, ScalarM, MPASMesh)
-
-dnorm_dscalar_fd = (normSqP - normSqM) / (ScalarP[k] - ScalarM[k])
-dnorm_dscalar    = d_Scalar[k]
-
-@info """ (gradients)\n
-For edge global index $k
-Enzyme computed $dnorm_dscalar
-Finite differences computed $dnorm_dscalar_fd
-"""
-
 ###
 ### Now let's test divergence:
 ###
@@ -114,7 +120,8 @@ d_normSq = autodiff(Enzyme.Reverse,
                     Duplicated(divNum, d_divNum),
                     Duplicated(VecEdge, d_VecEdge),
                     Duplicated(MPASMesh, d_MPASMesh))
-
+=#
+#=
 # For comparison, let's compute the derivative by hand for a given VecEdge entry:
 VecEdgeP = 𝐅ₑ(setup, PlanarTest)
 VecEdgeM = 𝐅ₑ(setup, PlanarTest)
