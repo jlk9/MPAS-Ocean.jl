@@ -76,7 +76,6 @@ function ocn_run_with_ad(config_fp)
     sumCPU   = zeros(Float64, (1,))
     d_sumCPU = zeros(Float64, (1,))
     @allowscalar timestep[1] = convert(Float64, Dates.value(Second(Setup.timeManager.timeStep)))
-    @show timestep, d_timestep
 
     #
     # Actual Model Run with AD
@@ -127,65 +126,12 @@ function ocn_run_with_ad(config_fp)
              Duplicated(outputAlarm, d_outputAlarm),
              )
     
-    # Let's try a FD comparison:
-    ϵ_range = [1e-1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
-
-    k = 741
-
-    println("For cell number")
-    
-    for ϵ in ϵ_range
-        SetupP, DiagP, TendP, ProgP            = ocn_init(config_fp, backend = backend)
-        clockP, simulationAlarmP, outputAlarmP = ocn_init_alarms(SetupP)
-
-        SetupM, DiagM, TendM, ProgM            = ocn_init(config_fp, backend = backend)
-        clockM, simulationAlarmM, outputAlarmM = ocn_init_alarms(SetupM)
-
-        @allowscalar ProgP.layerThickness[end][1,k] = ProgP.layerThickness[end][1,k] + abs(ProgP.layerThickness[end][1,k]) * ϵ
-        @allowscalar ProgM.layerThickness[end][1,k] = ProgM.layerThickness[end][1,k] - abs(ProgM.layerThickness[end][1,k]) * ϵ
-        
-        @allowscalar dist = ProgP.layerThickness[end][1,k] - ProgM.layerThickness[end][1,k]
-
-        sumP = ocn_run_loop(timestep, ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
-        sumM = ocn_run_loop(timestep, ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
-
-        #@show sumP, sumM
-        #@show dist
-
-        d_firstlayer_fd = (sumP - sumM) / dist
-
-        @show ϵ, d_firstlayer_fd
-    end
-    @allowscalar @show d_Prog.layerThickness[end][1,k]
-
-    # For normal velocity:
-    for ϵ in ϵ_range
-        SetupP, DiagP, TendP, ProgP            = ocn_init(config_fp, backend = backend)
-        clockP, simulationAlarmP, outputAlarmP = ocn_init_alarms(SetupP)
-
-        SetupM, DiagM, TendM, ProgM            = ocn_init(config_fp, backend = backend)
-        clockM, simulationAlarmM, outputAlarmM = ocn_init_alarms(SetupM)
-
-        @allowscalar ProgP.normalVelocity[end][1,k] = ProgP.normalVelocity[end][1,k] + abs(ProgP.normalVelocity[end][1,k]) * ϵ
-        @allowscalar ProgM.normalVelocity[end][1,k] = ProgM.normalVelocity[end][1,k] - abs(ProgM.normalVelocity[end][1,k]) * ϵ
-        
-        @allowscalar dist = ProgP.normalVelocity[end][1,k] - ProgM.normalVelocity[end][1,k]
-
-        sumP = ocn_run_loop(timestep, ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
-        sumM = ocn_run_loop(timestep, ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
-
-        d_firstvelocity_fd = (sumP - sumM) / dist
-
-        @show ϵ, d_firstvelocity_fd
-    end
-    @allowscalar @show d_Prog.normalVelocity[end][1,k]
-    
     #
     # Writing to outputs
     #
     
     # Only suport i/o at the end of the simulation for now 
-    #write_netcdf(Setup, Diag, Prog, d_Prog)
+    write_netcdf(Setup, Diag, Prog, d_Prog)
     
     backend = get_backend(Tend.tendNormalVelocity)
     arch = typeof(backend) <: KA.GPU ? "GPU" : "CPU"
@@ -200,23 +146,16 @@ function ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, si
     global i = 0
     # Run the model 
     while !isRinging(simulationAlarm)
-    
         advance!(clock)
-    
         global i += 1
         ocn_timestep(timestep, Prog, Diag, Tend, Setup, ForwardEuler; backend=backend)
-
-        #@show Diag.thicknessFlux[1:3]
-        
         if isRinging(outputAlarm)
             # should be doing i/o in here, using a i/o struct... unless we want to apply AD
             reset!(outputAlarm)
         end
     end
 
-    
     sum = 0.0
-    
     
     ssh_length = size(Prog.ssh)[1]
     for j = 1:ssh_length
@@ -224,13 +163,28 @@ function ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, si
     end
 
     return sum
-    
-    #=
+end
+
+# Helper function that runs the model "loop" without instantiating new memory or performing I/O.
+# This is what we call AD on. At the end we also sum up the squared SSH for testing purposes.
+function ocn_run_loop(sumCPU, sumGPU, timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=KA.CPU())
+    global i = 0
+    # Run the model 
+    while !isRinging(simulationAlarm)
+        advance!(clock)
+        global i += 1
+        ocn_timestep(timestep, Prog, Diag, Tend, Setup, ForwardEuler; backend=backend)
+        if isRinging(outputAlarm)
+            # should be doing i/o in here, using a i/o struct... unless we want to apply AD
+            reset!(outputAlarm)
+        end
+    end
+
     sumKernel! = sumArray(backend, 1)
     sumKernel!(sumGPU, Prog.ssh[end], size(Prog.ssh)[1], ndrange=1)
-    =#
-    #copyto!(sumCPU, sumGPU)
-    #return sumCPU[1]
+
+    copyto!(sumCPU, sumGPU)
+    return sumCPU[1]
 end
 
 @kernel function sumArray(sumGPU, @Const(array), length)
