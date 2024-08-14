@@ -20,8 +20,8 @@ mesh_fn  = "MokaMesh.nc"
 
 Downloads.download(mesh_url, mesh_fn)
 
-#backend = KA.CPU()
-backend = CUDABackend();
+backend = KA.CPU()
+#backend = CUDABackend();
 
 # Read in the purely horizontal doubly periodic testing mesh
 HorzMesh = ReadHorzMesh(mesh_fn; backend=backend)
@@ -41,7 +41,7 @@ nVertLevels = VertMesh.nVertLevels
 ###
 
 # As a clean / easy to read test, let's create an outer function that measures the squared norm of the gradient computed by kernel:
-function gradient_test(grad, hᵢ, mesh::Mesh; backend=CUDABackend())
+function gradient_test(grad, hᵢ, mesh::Mesh; backend=KA.CPU())
     GradientOnEdge!(grad, hᵢ, mesh::Mesh; backend=backend)
 end
 
@@ -97,7 +97,7 @@ end
 ###
 ### Now let's test divergence:
 ###
-function divergence_test(div, 𝐅ₑ, temp, mesh::Mesh; backend=CUDABackend())
+function divergence_test(div, 𝐅ₑ, temp, mesh::Mesh; backend=KA.CPU())
     DivergenceOnCell!(div, 𝐅ₑ, temp, mesh::Mesh; backend=backend, nthreads=64)
 end
 
@@ -133,9 +133,6 @@ for ϵ in ϵ_range
     @allowscalar VecEdgeP[kBegin] = VecEdgeP[kBegin] + abs(VecEdgeP[kBegin]) * ϵ
     @allowscalar VecEdgeM[kBegin] = VecEdgeM[kBegin] - abs(VecEdgeM[kBegin]) * ϵ
 
-    @allowscalar VecEdgePk = VecEdgeP[kBegin]
-    @allowscalar VecEdgeMk = VecEdgeM[kBegin]
-
     divNumFD = KA.zeros(backend, Float64, (nVertLevels, nCells))
     tempFD   = KA.zeros(backend, eltype(setup.EdgeNormalX), (nVertLevels, nEdges))
     divergence_test(divNumFD, VecEdgeP, tempFD, MPASMeshFD)
@@ -146,9 +143,8 @@ for ϵ in ϵ_range
     divergence_test(divNumFD, VecEdgeM, tempFD, MPASMeshFD)
     @allowscalar testM = divNumFD[kEnd]
 
-    @allowscalar dnorm_dvecedge_fd = (testP - testM) / (VecEdgePk - VecEdgeMk)
+    @allowscalar dnorm_dvecedge_fd = (testP - testM) / (VecEdgeP[kBegin] - VecEdgeM[kBegin])
     @allowscalar dnorm_dvecedge    = d_VecEdge[kBegin]
-    @allowscalar @show testP, testM, VecEdgePk, VecEdgeMk
 
     @info """ (divergence)\n
     For cell global input $kBegin, output $kEnd

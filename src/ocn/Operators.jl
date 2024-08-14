@@ -9,12 +9,12 @@ using KernelAbstractions
                                        n_{\rm e,i} F_{\rm e} l_{\rm e}
 ```
 """
-@kernel function DivergenceOnCell_P1(temp, @Const(VecEdge), @Const(dvEdge), length)
+@kernel function DivergenceOnCell_P1(temp, @Const(VecEdge), @Const(dvEdge), nEdges)
 
     #iEdge, k = @index(Global, NTuple)
     iEdge = @index(Global, Linear)
     k = 1
-    if iEdge < length + 1
+    if iEdge < nEdges + 1
         @inbounds temp[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
     end
     @synchronize()
@@ -57,10 +57,7 @@ function DivergenceOnCell!(DivCell, VecEdge, temp, Mesh::Mesh; backend=CUDABacke
     kernel1! = DivergenceOnCell_P1(backend, nthreads)
     kernel2! = DivergenceOnCell_P2(backend, nthreads)
     
-    # TODO: Add workgroupsize(s) as kwarg. As named tuple:
-    #       DivergenceOnCell!(...; workgroupsizes=(P1 = 64, P2 = 32))
     #kernel1!(VecEdge, dvEdge, ndrange=(nEdges, nVertLevels))
-
     kernel1!(temp, VecEdge, dvEdge, nEdges, ndrange=nEdges)
     
     kernel2!(DivCell,
@@ -204,7 +201,7 @@ end
 @kernel function interpolateCell2Edge(edgeValue, 
                                       @Const(cellValue), 
                                       @Const(cellsOnEdge),
-                                      length)
+                                      arrayLength)
     # global indices over nEdges
     #iEdge, k = @index(Global, NTuple)
     iEdge = @index(Global, Linear)
@@ -213,7 +210,7 @@ end
     # TODO: add conditional statement to check for masking if needed
 
     # cell connectivity information for iEdge
-    if iEdge < length + 1
+    if iEdge < arrayLength + 1
         @inbounds @private iCell1 = cellsOnEdge[1,iEdge]      
         @inbounds @private iCell2 = cellsOnEdge[2,iEdge]
 
@@ -225,9 +222,9 @@ end
 end
 
 # Zeros out a vector along its entire length
-@kernel function ZeroOutVector!(tendNormalVelocity, length)
+@kernel function ZeroOutVector!(tendNormalVelocity, arrayLength)
     j = @index(Global, Linear)
-    if j < length + 1
+    if j < arrayLength + 1
         tendNormalVelocity[1, j] = 0.0
     end
     @synchronize()

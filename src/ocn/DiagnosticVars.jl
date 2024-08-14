@@ -158,15 +158,15 @@ end
 @kernel function compute_thicknessFlux!(thicknessFlux,
                                         @Const(normalVelocity),
                                         @Const(layerThicknessEdge),
-                                        length)
+                                        arrayLength)
 
     j = @index(Global, Linear)
-    if j < length + 1
+    if j < arrayLength + 1
         @inbounds thicknessFlux[1,j] = normalVelocity[1,j] * layerThicknessEdge[1,j]
     end
 
     #k, j = @index(Global, NTuple)
-    #if j < length + 1
+    #if j < arrayLength + 1
     #    @inbounds thicknessFlux[k,j] = normalVelocity[k,j,end] * layerThicknessEdge[k,j]
     #end
     @synchronize()
