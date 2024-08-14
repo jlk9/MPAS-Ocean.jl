@@ -109,7 +109,7 @@ function ocn_run_with_ad(config_fp)
 
     #@show d_Prog
     #@show typeof(d_Prog.normalVelocity), typeof(Prog.normalVelocity)
-    @allowscalar d_Prog.layerThickness[end][1,1] = 1.0
+    #@allowscalar d_Prog.layerThickness[end][1,1] = 1.0
 
     
     d_sum = autodiff(Enzyme.Reverse,
@@ -133,12 +133,7 @@ function ocn_run_with_ad(config_fp)
     k = 741
 
     println("For cell number")
-    #@allowscalar @show k, d_Prog.layerThickness[end][1,k], d_Prog.normalVelocity[end][1,k]
-    @show d_Prog
-    #@show d_Diag.velocityDivCell
-    #@show d_Tend.tendLayerThickness
-    #@show d_sum
-    #=
+    
     for ϵ in ϵ_range
         SetupP, DiagP, TendP, ProgP            = ocn_init(config_fp, backend = backend)
         clockP, simulationAlarmP, outputAlarmP = ocn_init_alarms(SetupP)
@@ -154,8 +149,8 @@ function ocn_run_with_ad(config_fp)
         sumP = ocn_run_loop(timestep, ProgP, DiagP, TendP, SetupP, ForwardEuler, clockP, simulationAlarmP, outputAlarmP; backend=backend)
         sumM = ocn_run_loop(timestep, ProgM, DiagM, TendM, SetupM, ForwardEuler, clockM, simulationAlarmM, outputAlarmM; backend=backend)
 
-        @show sumP, sumM
-        @show dist
+        #@show sumP, sumM
+        #@show dist
 
         d_firstlayer_fd = (sumP - sumM) / dist
 
@@ -184,7 +179,7 @@ function ocn_run_with_ad(config_fp)
         @show ϵ, d_firstvelocity_fd
     end
     @allowscalar @show d_Prog.normalVelocity[end][1,k]
-    =#
+    
     #
     # Writing to outputs
     #
@@ -220,15 +215,17 @@ function ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, si
     end
 
     
-    #sum = 0.0
+    sum = 0.0
     
-    #=
+    
     ssh_length = size(Prog.ssh)[1]
     for j = 1:ssh_length
-        @allowscalar sum = sum + Prog.ssh[end][j]^2
+        sum = sum + Prog.ssh[end][j]^2
     end
+
+    return sum
     
-    
+    #=
     sumKernel! = sumArray(backend, 1)
     sumKernel!(sumGPU, Prog.ssh[end], size(Prog.ssh)[1], ndrange=1)
     =#
