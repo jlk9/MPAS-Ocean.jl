@@ -1,0 +1,6 @@
+[MPAS_Ocean_Shallow_Water_Meshes]
+git-tree-sha1 = "4b1ce2b80c7c352359c3d34cd71a59d76abb025e"
+lazy = true
+    [[MPAS_Ocean_Shallow_Water_Meshes.download]]
+    url = "https://web.cels.anl.gov/~mschanen/MPAS_Ocean_Shallow_Water_Meshes-70eca2f.tar.gz"
+    sha256 = "fcca5f34cfdd9e745dd24a7659265dd05d334bc26e3d9730189421ca8a781460"
