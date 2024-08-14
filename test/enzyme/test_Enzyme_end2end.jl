@@ -1,6 +1,11 @@
 
 # Currently blank - will determine best way to set up and write an end-2-end test here
 
+#TODO:
+# 1. Write section where we download / load the mesh and config file
+# 2. Break the following code up into different components. We already have ocn_run_with_ad in driver (with FD check removed),
+#    figure out best way to represent this using that and regular runs for FD comparison
+
 # Runs forward model with AD, and computes FD derivative approximations for comparison
 function ocn_run_with_ad(config_fp)
 
