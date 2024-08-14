@@ -40,20 +40,20 @@ function advanceTimeLevels!(Prog::PrognosticVars; backend=CUDABackend())
     end 
 end
 
-@kernel function advance_2d_array(fieldPrev, @Const(fieldNext), length)
+@kernel function advance_2d_array(fieldPrev, @Const(fieldNext), arrayLength)
     j = @index(Global, Linear)
-    if j < length + 1
+    if j < arrayLength + 1
         @inbounds fieldPrev[j] = fieldNext[j]
     end
     @synchronize()
 end
 
-@kernel function advance_3d_array(fieldPrev, @Const(fieldNext), length)
+@kernel function advance_3d_array(fieldPrev, @Const(fieldNext), arrayLength)
     #i, j = @index(Global, NTuple)
     #@inbounds fieldPrev[i, j] = fieldNext[i, j]
 
     j = @index(Global, Linear)
-    if j < length + 1
+    if j < arrayLength + 1
         @inbounds fieldPrev[1, j] = fieldNext[1, j]
     end
     @synchronize()
@@ -205,19 +205,19 @@ function ocn_timestep(timestep,
 end
 
 # Zeros out a vector along its entire length
-@kernel function UpdateStateVariable!(var, @Const(tendVar), @Const(dt), length)
+@kernel function UpdateStateVariable!(var, @Const(tendVar), @Const(dt), arrayLength)
     j = @index(Global, Linear)
-    if j < length + 1
+    if j < arrayLength + 1
         var[1,j] = var[1,j] + dt[1] * tendVar[1, j]
     end
     @synchronize()
 end
 
 
-@kernel function Update_ssh!(ssh, @Const(layerThickness), @Const(restingThicknessSum), length)
+@kernel function Update_ssh!(ssh, @Const(layerThickness), @Const(restingThicknessSum), arrayLength)
 
     j = @index(Global, Linear)
-    if j < length + 1
+    if j < arrayLength + 1
         @inbounds ssh[j] = layerThickness[1,j] - restingThicknessSum[j]
     end
     @synchronize()
