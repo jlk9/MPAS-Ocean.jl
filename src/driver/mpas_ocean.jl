@@ -26,8 +26,8 @@ function ocn_run(config_fp)
     #
     
     println("Setting the backend...")
-    backend = KA.CPU()
-    #backend = CUDABackend()
+    #backend = KA.CPU()
+    backend = CUDABackend()
     @show backend
     
     # Initialize the Model  
@@ -61,8 +61,8 @@ function ocn_run_with_ad(config_fp)
     # Setup for model
     #
     
-    backend = KA.CPU()
-    #backend = CUDABackend()
+    #backend = KA.CPU()
+    backend = CUDABackend()
 
     # Initialize the Model  
     Setup, Diag, Tend, Prog             = ocn_init(config_fp, backend = backend)
@@ -156,18 +156,18 @@ function ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, si
     end
 
     sum = 0.0
-    
+    #=
     ssh_length = size(Prog.ssh)[1]
     for j = 1:ssh_length
         sum = sum + Prog.ssh[end][j]^2
     end
-
+    =#
     return sum
 end
 
 # Helper function that runs the model "loop" without instantiating new memory or performing I/O.
 # This is what we call AD on. At the end we also sum up the squared SSH for testing purposes.
-function ocn_run_loop(sumCPU, sumGPU, timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=KA.CPU())
+function ocn_run_loop(sumCPU, sumGPU, timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, simulationAlarm, outputAlarm; backend=CUDABackend())
     global i = 0
     # Run the model 
     while !isRinging(simulationAlarm)
@@ -179,12 +179,13 @@ function ocn_run_loop(sumCPU, sumGPU, timestep, Prog, Diag, Tend, Setup, Forward
             reset!(outputAlarm)
         end
     end
-
+    
     sumKernel! = sumArray(backend, 1)
     sumKernel!(sumGPU, Prog.ssh[end], size(Prog.ssh)[1], ndrange=1)
 
     copyto!(sumCPU, sumGPU)
     return sumCPU[1]
+    
 end
 
 @kernel function sumArray(sumGPU, @Const(array), length)
