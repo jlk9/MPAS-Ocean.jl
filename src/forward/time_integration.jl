@@ -4,7 +4,7 @@ abstract type timeStepper end
 abstract type ForwardEuler <: timeStepper end 
 abstract type RungeKutta4  <: timeStepper end
 
-#using CUDA: @allowscalar
+using CUDA: @allowscalar
 using KernelAbstractions
 
 function advanceTimeLevels!(Prog::PrognosticVars; backend=CUDABackend())
@@ -31,7 +31,6 @@ function advanceTimeLevels!(Prog::PrognosticVars; backend=CUDABackend())
             kernel2d!(field[1], field[2], size(field[1])[1], ndrange=size(field[1])[1])
         else
             #field[:,:,end-1] .= field[:,:,end]
-            #@show size(field)
             #kernel3d!(field, ndrange=(size(field)[1],size(field)[2]))
             kernel3d!(field[1], field[2], size(field[1])[2], ndrange=size(field[1])[2])
         end
