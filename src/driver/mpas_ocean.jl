@@ -6,7 +6,9 @@ using KernelAbstractions
 
 using CUDA: @allowscalar
 
-using Enzyme
+mycopyto!(dest, src) = copyto!(dest, src)
+
+include("../../ext/EnzymeExt.jl")
 
 # Might need to remove these:
 #Enzyme.EnzymeRules.inactive_type(::Type{<:MOKA.ModelSetup}) = true
@@ -106,8 +108,8 @@ function ocn_run_with_ad(config_fp)
     
     d_sum = autodiff(Enzyme.Reverse,
              ocn_run_loop,
-             #Duplicated(sumCPU, d_sumCPU),
-             #Duplicated(sumGPU, d_sumGPU),
+             Duplicated(sumCPU, d_sumCPU),
+             Duplicated(sumGPU, d_sumGPU),
              Duplicated(timestep, d_timestep),
              Duplicated(Prog, d_Prog),
              Duplicated(Diag, d_Diag),
@@ -119,6 +121,9 @@ function ocn_run_with_ad(config_fp)
              Duplicated(outputAlarm, d_outputAlarm),
              )
     
+    @show d_Prog.normalVelocity[end][1:10]
+    @show d_Prog.layerThickness[end][1:10]
+
     #
     # Writing to outputs
     #
@@ -176,7 +181,7 @@ function ocn_run_loop(sumCPU, sumGPU, timestep, Prog, Diag, Tend, Setup, Forward
     sumKernel! = sumArray(backend, 1)
     sumKernel!(sumGPU, Prog.ssh[end], size(Prog.ssh)[1], ndrange=1)
 
-    copyto!(sumCPU, sumGPU)
+    mycopyto!(sumCPU, sumGPU)
     return sumCPU[1]
     
 end
@@ -190,6 +195,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     if isfile(ARGS[1])
         if (length(ARGS) > 1 && ARGS[2] == "--with_ad")
+            using Enzyme
             ocn_run_with_ad(ARGS[1])
         else
             ocn_run(ARGS[1])
