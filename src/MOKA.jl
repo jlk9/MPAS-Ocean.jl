@@ -43,8 +43,6 @@ module MOKA
     include("forward/time_integration.jl")
     
     include("Architectures.jl")
-
-    include("../ext/custom_rules.jl")
     
     ###
     ### Needed so we can export names from sub-modules at the top level

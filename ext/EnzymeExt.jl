@@ -7,8 +7,6 @@ using Adapt
 using Test
 using KernelAbstractions
 
-mycopyto!(dest, src) = copyto!(dest, src)
-
 function EnzymeRules.augmented_primal(
         config,
         func::Const{typeof(mycopyto!)},
@@ -16,7 +14,7 @@ function EnzymeRules.augmented_primal(
         dest::Annotation,
         src::Annotation,
     ) where {RT}
-    println("Forward rule")
+    #println("Forward rule")
     copyto!(dest.val, src.val)
     return EnzymeRules.AugmentedReturn(nothing,nothing,nothing)
 end
@@ -29,7 +27,7 @@ function EnzymeRules.reverse(
         dest::Annotation,
         src::Annotation
     ) where {RT}
-    println("Reverse rule")
+    #println("Reverse rule")
     copyto!(src.dval, dest.dval)
     return (nothing,nothing)
 end
