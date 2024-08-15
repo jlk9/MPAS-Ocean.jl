@@ -13,6 +13,8 @@ module MOKA
            DivergenceOnCell!, 
            CurlOnVertex!,
            ZeroOutVector!
+
+    export mycopyto!
     
 
     using Dates, YAML, NCDatasets, UnPack, Statistics, Logging, KernelAbstractions
@@ -41,6 +43,8 @@ module MOKA
     include("forward/time_integration.jl")
     
     include("Architectures.jl")
+
+    include("../ext/custom_rules.jl")
     
     ###
     ### Needed so we can export names from sub-modules at the top level
