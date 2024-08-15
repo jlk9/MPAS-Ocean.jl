@@ -103,13 +103,6 @@ function ocn_run_with_ad(config_fp)
     d_clock = Enzyme.make_zero(clock)
     d_simulationAlarm = Enzyme.make_zero(simulationAlarm)
     d_outputAlarm = Enzyme.make_zero(outputAlarm)
-
-    #@allowscalar d_Prog.ssh[end][1] = 1.0
-
-    #@show d_Prog
-    #@show typeof(d_Prog.normalVelocity), typeof(Prog.normalVelocity)
-    #@allowscalar d_Prog.layerThickness[end][1,1] = 1.0
-
     
     d_sum = autodiff(Enzyme.Reverse,
              ocn_run_loop,
