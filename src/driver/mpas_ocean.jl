@@ -8,8 +8,6 @@ using CUDA: @allowscalar
 
 mycopyto!(dest, src) = copyto!(dest, src)
 
-include("../../ext/EnzymeExt.jl")
-
 # Might need to remove these:
 #Enzyme.EnzymeRules.inactive_type(::Type{<:MOKA.ModelSetup}) = true
 #Enzyme.EnzymeRules.inactive_type(::Type{<:MOKA.Clock}) = true
@@ -153,14 +151,7 @@ function ocn_run_loop(timestep, Prog, Diag, Tend, Setup, ForwardEuler, clock, si
         end
     end
 
-    sum = 0.0
-    #=
-    ssh_length = size(Prog.ssh)[1]
-    for j = 1:ssh_length
-        sum = sum + Prog.ssh[end][j]^2
-    end
-    =#
-    return sum
+    return nothing
 end
 
 # Helper function that runs the model "loop" without instantiating new memory or performing I/O.
@@ -195,7 +186,7 @@ end
 if abspath(PROGRAM_FILE) == @__FILE__
     if isfile(ARGS[1])
         if (length(ARGS) > 1 && ARGS[2] == "--with_ad")
-            using Enzyme
+            include("../../ext/EnzymeExt.jl")
             ocn_run_with_ad(ARGS[1])
         else
             ocn_run(ARGS[1])

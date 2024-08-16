@@ -167,11 +167,6 @@ function ocn_timestep(timestep,
     
     # compute the diagnostics
     diagnostic_compute!(Mesh, Diag, Prog; backend = backend)
-    
-    #@show Diag.layerThicknessEdge[10:20]
-    #@show Diag.thicknessFlux[1037:1047]
-    #@show Diag.velocityDivCell[2001:2011]
-    #@show Diag.relativeVorticity[13:23]
 
     # compute normalVelocity tenedency 
     computeNormalVelocityTendency!(Tend, Prog, Diag, Mesh, Config;
@@ -187,12 +182,6 @@ function ocn_timestep(timestep,
 
     tendKernel!(normalVelocity[end], Tend.tendNormalVelocity, timestep, Mesh.HorzMesh.Edges.nEdges, ndrange=Mesh.HorzMesh.Edges.nEdges)
     tendKernel!(layerThickness[end], Tend.tendLayerThickness, timestep, Mesh.HorzMesh.PrimaryCells.nCells, ndrange=Mesh.HorzMesh.PrimaryCells.nCells)
-    
-    #@show Tend.tendNormalVelocity[1,5123:5125]
-    #@show normalVelocity[end][1,5123:5125]
-
-    #@show tendLayerThickness[1,1298:1300]
-    #@show layerThickness[end][1,1298:1300]
     
     ssh_length = size(ssh[end])[1]
 
