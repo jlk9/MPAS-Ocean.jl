@@ -187,6 +187,7 @@ if abspath(PROGRAM_FILE) == @__FILE__
     if isfile(ARGS[1])
         if (length(ARGS) > 1 && ARGS[2] == "--with_ad")
             include("../../ext/EnzymeExt.jl")
+            #using Enzyme
             ocn_run_with_ad(ARGS[1])
         else
             ocn_run(ARGS[1])
