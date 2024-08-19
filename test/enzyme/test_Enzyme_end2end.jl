@@ -1,5 +1,27 @@
+using Test
+using CUDA
+using MOKA
+using UnPack
+using CUDA: @allowscalar
+using Enzyme
 
-# Currently blank - will determine best way to set up and write an end-2-end test here
+# include the testcase definition utilities
+include("../utilities.jl")
+
+# Replace these with intertialgravity waves and a config file:
+#mesh_url = "https://gist.github.com/mwarusz/f8caf260398dbe140d2102ec46a41268/raw/e3c29afbadc835797604369114321d93fd69886d/PlanarPeriodic48x48.nc"
+#mesh_fn  = "MokaMesh.nc"
+
+#Downloads.download(mesh_url, mesh_fn)
+
+#backend = KA.CPU()
+backend = CUDABackend();
+
+function test_ocn_run_with_ad()
+    Base.run(`julia --project src/driver/mpas_ocean.jl test_config.yml --with_ad`)
+end
+
+test_ocn_run_with_ad()
 
 #TODO:
 # 1. Write section where we download / load the mesh and config file
@@ -13,8 +35,8 @@ function ocn_run_with_ad(config_fp)
     # Setup for model
     #
     
-    backend = KA.CPU()
-    #backend = CUDABackend()
+    #backend = KA.CPU()
+    backend = CUDABackend()
 
     # Initialize the Model  
     Setup, Diag, Tend, Prog             = ocn_init(config_fp, backend = backend)
