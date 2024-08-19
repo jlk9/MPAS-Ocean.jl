@@ -41,7 +41,7 @@ module MOKA
 
     include("forward/init.jl")
     include("forward/time_integration.jl")
-    include("driver/mpas_ocean.jl")
+    include("forward/run_loop.jl")
     
     include("Architectures.jl")
     
