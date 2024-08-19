@@ -170,15 +170,15 @@ function ocn_run_loop(sumCPU, sumGPU, timestep, Prog, Diag, Tend, Setup, Forward
     end
     
     sumKernel! = sumArray(backend, 1)
-    sumKernel!(sumGPU, Prog.ssh[end], size(Prog.ssh)[1], ndrange=1)
+    sumKernel!(sumGPU, Prog.ssh[end], size(Prog.ssh[end])[1], ndrange=1)
 
     mycopyto!(sumCPU, sumGPU)
     return sumCPU[1]
     
 end
 
-@kernel function sumArray(sumGPU, @Const(array), length)
-    for j = 1:length
+@kernel function sumArray(sumGPU, @Const(array), arrayLength)
+    for j = 1:arrayLength
         sumGPU[1] = sumGPU[1] + array[j]*array[j]
     end
 end

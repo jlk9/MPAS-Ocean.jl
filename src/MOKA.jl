@@ -1,6 +1,6 @@
 module MOKA
     
-    export ocn_init, ocn_init_shadows, ocn_init_alarms, isRinging, advance!, ocn_timestep, changeTimeStep!, reset!
+    export ocn_run_loop, ocn_init, ocn_init_shadows, ocn_init_alarms, isRinging, advance!, ocn_timestep, changeTimeStep!, reset!
     export RungeKutta4, ForwardEuler 
     export write_netcdf
     
@@ -41,6 +41,7 @@ module MOKA
 
     include("forward/init.jl")
     include("forward/time_integration.jl")
+    include("driver/mpas_ocean.jl")
     
     include("Architectures.jl")
     
