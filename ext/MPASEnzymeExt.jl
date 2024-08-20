@@ -1,4 +1,4 @@
-module EnzymeExt
+module MPASEnzymeExt
 
 using MOKA
 using Enzyme

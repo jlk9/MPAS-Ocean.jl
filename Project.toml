@@ -27,7 +27,7 @@ UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [extensions]
-EnzymeExt = "Enzyme"
+MPASEnzymeExt = "Enzyme"
 
 [weakdeps]
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
