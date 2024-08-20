@@ -65,7 +65,9 @@ VecEdge = 𝐅ₑ(setup, PlanarTest)
 divAnn = div𝐅(setup, PlanarTest)
 # Numerical divergence using KernelAbstractions operator
 divNum = KA.zeros(backend, Float64, (nVertLevels, nCells))
-@allowscalar DivergenceOnCell!(divNum, VecEdge, MPASMesh; backend=backend)
+temp   = KA.zeros(backend, Float64, (nVertLevels, nEdges))
+
+DivergenceOnCell!(divNum, VecEdge, temp, MPASMesh; backend=backend)
 
 divError = ErrorMeasures(divNum, divAnn, HorzMesh, Cell)
 
