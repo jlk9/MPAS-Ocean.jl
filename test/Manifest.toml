@@ -2,7 +2,7 @@
 
 julia_version = "1.10.4"
 manifest_format = "2.0"
-project_hash = "33bad625dc6e8592b0634f246cbeca5092946ff1"
+project_hash = "3ce932acab6ef0aa9e85e0105ffc852560f4177e"
 
 [[deps.AMDGPU]]
 deps = ["AbstractFFTs", "Adapt", "Atomix", "CEnum", "ExprTools", "GPUArrays", "GPUCompiler", "HIP_jll", "KernelAbstractions", "LLD_jll", "LLVM", "LLVM_jll", "Libdl", "LinearAlgebra", "Pkg", "Preferences", "PrettyTables", "Printf", "ROCmDeviceLibs_jll", "Random", "Random123", "RandomNumbers", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "Statistics", "UnsafeAtomics", "UnsafeAtomicsLLVM", "hsa_rocr_jll"]
