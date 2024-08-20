@@ -2,8 +2,10 @@ using LazyArtifacts
 using NCDatasets
 
 
-const MESHES_DIR = joinpath(artifact"MPAS_Ocean_Shallow_Water_Meshes", "MPAS_Ocean_Shallow_Water_Meshes")
+const MESHES_DIR = joinpath(artifact"inertialGravityWave")
 
-meshfile = joinpath(MESHES_DIR, "InertiaGravityWaveMesh", "mesh.nc")
+resolution = "25km"
+
+meshfile = joinpath(MESHES_DIR, "inertialGravityWave", resolution, "initial_state.nc")
 
 data = NCDataset(meshfile, "r", format=:netcdf4)
