@@ -1,10 +1,13 @@
+module EnzymeExt
+
+using MOKA
 using Enzyme
 using Enzyme: EnzymeCore
 using Enzyme: EnzymeCore.EnzymeRules
 
 using CUDA
 using Adapt
-using Test
+#using Test
 using KernelAbstractions
 
 function EnzymeRules.augmented_primal(
@@ -32,6 +35,7 @@ function EnzymeRules.reverse(
     return (nothing,nothing)
 end
 
+#=
 function test_copyto!(destB, srcB)
     dest = adapt(destB, zeros(10))
     src = adapt(srcB, ones(10))
@@ -47,8 +51,11 @@ function test_copyto!(destB, srcB)
     autodiff(Reverse, mycopyto!, Const, ddest, dsrc)
     @test all(adapt(CPU, dsrc.dval) .== 1.0)
 end
+=#
 
 #test_copyto!(CPU(), CPU())
 #test_copyto!(CUDABackend(), CPU())
 #test_copyto!(CPU(), CUDABackend())
 #test_copyto!(CUDABackend(), CUDABackend())
+
+end
