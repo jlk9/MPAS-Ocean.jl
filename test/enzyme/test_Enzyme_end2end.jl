@@ -1,8 +1,6 @@
 using Test
 using Dates
-using CUDA
-using MOKA
-using CUDA: @allowscalar
+using CUDA: @allowscalar, CUDABackend
 using Enzyme
 
 # include the testcase definition utilities

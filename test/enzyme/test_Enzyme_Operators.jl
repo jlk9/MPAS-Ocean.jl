@@ -41,7 +41,7 @@ nVertLevels = VertMesh.nVertLevels
 ###
 
 # As a clean / easy to read test, let's create an outer function that measures the squared norm of the gradient computed by kernel:
-function gradient_test(grad, hᵢ, mesh::Mesh; backend=KA.CPU())
+function gradient_test(grad, hᵢ, mesh::Mesh; backend=CUDABackend())
     GradientOnEdge!(grad, hᵢ, mesh::Mesh; backend=backend)
 end
 
@@ -97,7 +97,7 @@ end
 ###
 ### Now let's test divergence:
 ###
-function divergence_test(div, 𝐅ₑ, temp, mesh::Mesh; backend=KA.CPU())
+function divergence_test(div, 𝐅ₑ, temp, mesh::Mesh; backend=CUDABackend())
     DivergenceOnCell!(div, 𝐅ₑ, temp, mesh::Mesh; backend=backend, nthreads=64)
 end
 
