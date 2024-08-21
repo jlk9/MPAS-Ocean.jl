@@ -4,14 +4,26 @@ using CUDA: @allowscalar, CUDABackend
 using KernelAbstractions
 using Enzyme
 
+using LazyArtifacts
+
 # include the testcase definition utilities
 include("../utilities.jl")
 
 # Replace these with intertialgravity waves and a config file:
-#mesh_url = "https://gist.github.com/mwarusz/f8caf260398dbe140d2102ec46a41268/raw/e3c29afbadc835797604369114321d93fd69886d/PlanarPeriodic48x48.nc"
-#mesh_fn  = "MokaMesh.nc"
+const MESHES_DIR = joinpath(artifact"inertialGravityWave")
+resolution = "200km"
+mesh_file   = joinpath(MESHES_DIR, "inertialGravityWave", resolution, "initial_state.nc")
+config_file = joinpath(MESHES_DIR, "inertialGravityWave", resolution, "config.yml")
+mesh_fn    = "initial_state.nc"
+config_fn  = "test_config_artifact.yml"
+
+#@show config_url
+
+cp(mesh_file, mesh_fn)
+cp(config_file, config_fn)
 
 #Downloads.download(mesh_url, mesh_fn)
+#Downloads.download(config_url, config_fn)
 
 #backend = KA.CPU()
 backend = CUDABackend();
@@ -163,5 +175,5 @@ function ocn_run_fd(config_fp, k; backend=CUDABackend())
     end
 end
 
-ocn_run_with_ad("./test_config.yml")
-ocn_run_fd("./test_config.yml", 5; backend=backend)
+ocn_run_with_ad(config_fn)
+ocn_run_fd(config_fn, 5; backend=backend)

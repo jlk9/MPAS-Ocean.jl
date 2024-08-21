@@ -1,0 +1,6 @@
+[inertialGravityWave]
+git-tree-sha1 = "5c8cb90901752d48027cfcc4669d7893120667cb"
+lazy = true
+    [[inertialGravityWave.download]]
+    url = "https://web.cels.anl.gov/~mschanen/inertialGravityWave-756789d.tar.gz"
+    sha256 = "bb78470bed71f05a11979266ee4f7592a50a0f3b6c0ce10bc932d74b09e26ceb"
