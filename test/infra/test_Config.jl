@@ -1,64 +1,44 @@
 using Test
-import YAML 
+using Dates
+using MOKA: ConfigRead, ConfigGet, GlobalConfig, yaml_config,
+            ConfigSet, ConfigAdd
 
-include("../src/infra/Config.jl")
+ref_hmix_String = "Restart_timestamp"
+ref_hmix_Float  = 1.234567890
+ref_hmix_None   = "none"
+ref_hmix_On     = true
+ref_hmix_Off    = false
+ref_hmix_Exp    = 1.e25
 
+# read the test configuration file from the temporary file 
+config = ConfigRead("test.yaml")
 
-# I'm not sure this is worth it. 
-@test typeof(namelist_config(Dict{}())) == namelist_config
-@test typeof(streams_config(Dict{}())) == streams_config 
+# parse 
+hmixConfig      = ConfigGet(config.namelist, "hmix")
+intervalsConfig = ConfigGet(config.streams,  "intervals")
+datetimesConfig = ConfigGet(config.streams,  "datetimes")
 
-dict_type = Dict{String, Any}
+# Test parsing various datatypes
+@test ref_hmix_String == ConfigGet(hmixConfig, "hmix_String") 
+@test ref_hmix_Float  == ConfigGet(hmixConfig, "hmix_Float") 
+@test ref_hmix_None   == ConfigGet(hmixConfig, "hmix_None") 
+@test ref_hmix_On     == ConfigGet(hmixConfig, "hmix_On") 
+@test ref_hmix_Off    == ConfigGet(hmixConfig, "hmix_Off") 
+@test ref_hmix_Exp    == ConfigGet(hmixConfig, "hmix_Exp") 
 
-namelist_test = dict_type("hmix" => dict_type("config_hmix_ref_cell_width" => 30000.0, 
-                                              "config_apvm_scale_factor" => 0.0, 
-                                              "config_hmix_scaleWithMesh" => false, 
-                                              "config_maxMeshDensity" => -1.0, 
-                                              "config_hmix_use_ref_cell_width" => false),
+# Test parsing Periods
+@test Year(1)   == ConfigGet(intervalsConfig, "yearly_interval")
+@test Month(2)  == ConfigGet(intervalsConfig, "monthly_interval")
+@test Day(3)    == ConfigGet(intervalsConfig, "daily_interval")
+@test Hour(4)   == ConfigGet(intervalsConfig, "hourly_interval")
+@test Minute(5) == ConfigGet(intervalsConfig, "minutes_interval")
+@test Second(6) == ConfigGet(intervalsConfig, "seconds_interval")
 
-                         "time_management" => dict_type("config_run_duration" => "0010_00:00:00", 
-                                                        "config_do_restart" => false, 
-                                                        "config_calendar_type" => "noleap", 
-                                                        "config_restart_timestamp_name" => "Restart_timestamp", 
-                                                        "config_stop_time" => "none", 
-                                                        "config_output_reference_time" => "0001-01-01_00:00:00", 
-                                                        "config_start_time" => "0001-01-01_00:00:00"))
-# Test dictionary to write to temp file
-streams_test = dict_type("streams" => dict_type(
-                                      dict_type("mesh" => dict_type("type" => "input", 
-                                                                    "filename_template"=>"init.nc", 
-                                                                    "input_interval" => "initial_only"), 
-
-                                                "output" => dict_type("filename_interval" => "01-00-00_00:00:00", 
-                                                                      "clobber_mode" => "truncate", 
-                                                                      "filename_template" => "output.nc", 
-                                                                      "output_interval" => "0000_10:00:00", 
-                                                                      "contents" => ["xtime", "normalVelocity", "layerThickness", "ssh"], 
-                                                                      "precision" => "double", 
-                                                                      "type" => "output", 
-                                                                      "reference_time" => "0001-01-01_00:00:00"))))
-
-
-
-
-# pack the namelist and stream dictionaries into to a test YAML dictionary 
-YAML_test = dict_type("omega" => merge(namelist_test, streams_test))
-
-mktemp("") do path, io
-    # write the test dictionary to the temporary file 
-    YAML.write_file(path, YAML_test)
-    
-    # read the test configuration file from the temporary file 
-    config = ConfigRead(path)
-
-    # try parsing a block 
-    hmixConfig = ConfigGet(config.namelist, "hmix")
-    # try getting an actual varibale value 
-    hmixRefCellWidth = ConfigGet(hmixConfig, "config_hmix_ref_cell_width")
-
-    @test hmixRefCellWidth ≈ 30000.0
-
-end 
-
-
-
+# Test parsing DateTimes
+@test DateTime(1,1,1,0,0,0) == ConfigGet(datetimesConfig, "NO_HMS")
+@test DateTime(1,1,1,2,0,0) == ConfigGet(datetimesConfig, "NO_MS")  
+@test DateTime(1,1,1,2,3,0) == ConfigGet(datetimesConfig, "NO_S")
+@test DateTime(1,1,1,0,3,4) == ConfigGet(datetimesConfig, "NO_H")   
+@test DateTime(1,1,1,0,0,4) == ConfigGet(datetimesConfig, "NO_HM")  
+@test DateTime(1,1,1,0,3,0) == ConfigGet(datetimesConfig, "NO_HS")  
+@test DateTime(1,1,1,2,3,4) == ConfigGet(datetimesConfig, "ALL_HMS")

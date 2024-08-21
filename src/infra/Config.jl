@@ -1,11 +1,4 @@
-
-import YAML: compose, Resolver, Composer, forward!, StreamStartEvent, compose_document, 
-             StreamEndEvent, peek, DocumentStartEvent, TokenStream, Constructor, load, 
-             EventStream, Node, construct_document
-"""Types which inherit from `yaml_config` should have 
-a `dict` attribute. 
-"""
-abstract type yaml_config end 
+using YAML
 
 """Making an alias for the type of dict attribute
 to allow for more flexibility if it were to change 
@@ -13,6 +6,31 @@ in the future
 """
 dict_type = Dict{Any, Any}
 
+"""Types which inherit from `yaml_config` should have 
+a `dict` attribute. 
+"""
+mutable struct yaml_config
+    dict::dict_type
+end
+
+"""Default constructor for testing/debugging
+"""
+yaml_config() = yaml_config(dict_type())
+
+"""
+Struct which stores the namelist and streams config strucutres
+"""
+struct GlobalConfig
+    namelist::yaml_config
+    streams::yaml_config
+end 
+
+"""
+Default constructor, only intended used for testing/debugging
+"""
+function GlobalConfig()
+    GlobalConfig(yaml_config(dict_type()), yaml_config(dict_type()))
+end
 
 """
 Following Omega specs, define method to get
@@ -22,7 +40,6 @@ can be used to create a new instance if string
 corresponds to header, not a config option. 
 """
 function ConfigGet(d::C, s::String) where {C<:yaml_config}
-    # could call exists function here
     
     # access the underlying dictionary contained within the object
     # and use key (string) to get config info 
@@ -38,6 +55,35 @@ function ConfigGet(d::C, s::String) where {C<:yaml_config}
     end
 end
 
+""" Method for adding a new configuration option (and value)
+"""
+function ConfigAdd(d::C, s::String, val) where {C<:yaml_config}
+
+    if haskey(d.dict, s)
+        error("ConfigAdd: variable $(s) already exists use ConfigSet instead")
+    else
+        d.dict[s] = val
+    end
+end
+
+""" Method for overwriting value of existing configuration setting
+"""
+function ConfigSet(d::C, s::String, val) where {C<:yaml_config}
+
+    if haskey(d.dict, s)
+
+        # check that the type of the new value is the same as existing
+        if typeof(d.dict[s]) != typeof(val)
+            @warn """ConfigSet: Changing typeof \"$(s)\",
+                     $(typeof(d.dict[s])) != $(typeof(val))
+                  """
+        end
+
+        d.dict[s] = val
+    else
+        error("ConfigSet: Could not find variable $(s)")
+    end
+end
 
 #= DEFINE ALL THE SHARED METHODS HERE: 
     1. config get 
@@ -47,60 +93,45 @@ end
     5. config write 
 =# 
 
-
-
-"""
-As these types inherit from `yaml_config` they need
-a `dict` attribute 
-"""
-struct namelist_config <: yaml_config
-    dict::dict_type
-end 
-
-struct streams_config <: yaml_config
-    dict::dict_type
-end 
-
-
-"""
-Struct which stores the namelist and streams config strucutres
-"""
-struct GlobalConfig
-    namelist::namelist_config
-    streams::streams_config
-end 
-
-
 function ConfigRead(filepath::AbstractString)
-    #=
-    this function SHOULD: 
-        1. check that the input filepath exists
-        2. return a instance of the Config datastructure (which I guess has to be mutable)
-    =#
 
     # check that the config YAML file exists
     if !isfile(filepath)
-        # TO DO: Use logging library to write error message 
         error("YAML configuration file does not exist")
     end
+    
+    # load YAML file as a dictionary
+    config = YAML.load_file(filepath)
 
-    # load YAML file where dictionary keys are forced to types defined in 
-    # the dictionary above. 
-    config = open(filepath, "r") do input
-        load(input, MPAS_Custom_Constructor(); resolver=MPAS_Custom_Resolver())
-    end 
-
-    # Extract the "streams" dictionary from the namelist dictionary 
+    # Extract the "streams"/"namelist" dicts from the global YAML dict
     streams = pop!(config["omega"], "streams")
-    # Extract the "namelist" dictionary from the global YAML file 
     namelist = pop!(config, "omega")
 
-    # Create the instances of the namelist and streams configuration structs
-    name = namelist_config(namelist)
-    stream = streams_config(streams)
+    # Traverse the namelist/streams dicts and parse the timestamps/timeintervals
+    streams  = parse_Datetimes(streams)
+    namelist = parse_Datetimes(namelist)
 
-    # Pack the namelist and streams config. structs into the global config struct 
-    return GlobalConfig(name, stream)
+    # Pack the namelist and streams into the global config struct 
+    return GlobalConfig(yaml_config(namelist), yaml_config(streams))
+end
+
+function parse_Datetimes(dict::Dict{Any,Any})
+    
+    for (key, value) in dict
+
+        # recursion to traverse nested dictionaries
+        if value isa Dict
+            parse_Datetimes(value)
+            continue
+        end
+
+        # check if the timestamp pattern occurs in the string values
+        if value isa String && occursin(timestamp_pat, value)
+            dict[key] = DateTime_from_String(value)
+        end 
+    end
+
+    return dict
 end
 
 # to do: Need to generalize this regex pattern to work for all the possible 
@@ -130,15 +161,16 @@ function index_to_period(captures)
     idx == 6 && return Second(captures[idx])
 end
 
-function construct_MPAS_TimeStamp(constructor::YAML.Constructor, node::YAML.Node)
-    value = YAML.construct_scalar(constructor, node)
-    mat = match(timestamp_pat, value)
+function DateTime_from_String(string::String)
+
+    mat = match(timestamp_pat, string)
+
     if mat === nothing
         throw(YAML.ConstructorError(nothing, nothing,
             "could not make sense of timestamp format", node.start_mark))
     end
     
-    # In the case where all groups are passed, should be a DateTime type 
+    # If all fields are passed and non-zero, will be parsed as DateTime
     if all(mat.captures .!= nothing)
         h  = parse(Int, mat.captures[4])
         m  = parse(Int, mat.captures[5])
@@ -148,10 +180,10 @@ function construct_MPAS_TimeStamp(constructor::YAML.Constructor, node::YAML.Node
         mn = parse(Int, mat.captures[2])
         dy = parse(Int, mat.captures[3])
         
+        # If month/day are equal to zero the string is a TimeInterval 
+        # (c.f. DateTime) so the `index_to_period` method will do the parsing
         if !any(iszero.((mn,dy)))
             return DateTime(yr, mn, dy, h, m, s)
-        else 
-            return "too complicated for right now"
         end
     end 
     
@@ -166,7 +198,6 @@ function construct_MPAS_TimeStamp(constructor::YAML.Constructor, node::YAML.Node
         return index_to_period(captures)
     end 
     
-    # Need more error handling for intermediate cases
     h  = parse(Int, mat.captures[4])
     m  = parse(Int, mat.captures[5])
     s  = parse(Int, mat.captures[6])
@@ -174,78 +205,21 @@ function construct_MPAS_TimeStamp(constructor::YAML.Constructor, node::YAML.Node
     # No Y/M/D info in timestamp
     if all(mat.captures[1:3] .=== nothing)
         return Time(h, m, s)
+    # When: "D_hh::mm::ss"
     elseif all(mat.captures[1:2] .=== nothing)
-    # add case for time detlas in months
-        
         if parse(Int, mat.captures[3]) == 0 
-            # return period, NOT time 
+            ## if days field is speficied but zero does this denotes a Period??
+            ## (c.f. Time), if so we should return a CompundPeriod type
             #return Hour(h) + Minute(m) + Second(s)
+            
+            # Do simple case of just returning a Time obj. for now
             return Time(h,m,s)
-        else 
-            return "time delta in days"
         end 
     end
 
-    yr = parse(Int, mat.captures[1])
-    mn = parse(Int, mat.captures[2])
-    dy = parse(Int, mat.captures[3])
+    @warn """ Failed to parse $(string) """
 
-
-	# handle the interval options, year is allowed to be zero 	 
-	# but month and day are not 
-	if any(iszero.((mn,dy)))
-		return "time delta in years"
-	end 
-
-    #return DateTime(yr, mn, dy, h, m, s)
+    # in the case where we fail to parse the DateTime/Period just return 
+    # the original string after having raised a warning
+    return string
 end
- 
-function MPAS_Custom_Resolver()
-    # Make is so that the resolver and the constructor regex pattern 
-    # are both added globably. 
-    MPAS_TimeStamp_Resolver = tuple("tag:MPAS_timestamp", timestamp_pat) 
- 
-    # Instansiate the Resolver struct, so that the defaults can be 
-    # over written and passed to our custom `load` method 
-    resolver = Resolver()
-
-    # append the custom MPAS timestamp resolver to the end of the arrray
-    # of regex patterns within the instance of the `Resolver`
-    push!(resolver.implicit_resolvers, MPAS_TimeStamp_Resolver)
-
-    resolver 
-end 
-
-"""Create a custom constructor object, which is able to parse 
-the MPAS timestamp format. 
-"""
-function MPAS_Custom_Constructor()
-    # Get the deafault constructors
-	yaml_constructors = copy(YAML.default_yaml_constructors)
-	# Add a new constructor, for the MPAS timestamps  
-	yaml_constructors["tag:MPAS_timestamp"] = construct_MPAS_TimeStamp
-	# return an Construcutor object, which will parse the MPAS timestamps
-	YAML.Constructor(yaml_constructors)
-end
-
-
-function compose(events; resolver::Union{Resolver, Nothing}=nothing)
-    # if no resolver was passed, return default resolver. 
-    # otherwise use resolver passed as kwarg 
-    resolver = resolver ==  nothing ? Resolver : resolver 
-    composer = Composer(events, Dict{String, Node}(), resolver)
-    @assert typeof(forward!(composer.input)) == StreamStartEvent
-    node = compose_document(composer)
-    if typeof(peek(composer.input)) == StreamEndEvent
-        forward!(composer.input)
-    else 
-        @assert typeof(peek(composer.input)) == DocumentStartEvent
-    end 
-    node
-end 
-
-load(ts::TokenStream, constructor::Constructor; resolver::Resolver) = 
-    construct_document(constructor, compose(EventStream(ts); resolver=resolver))
-
-load(input::IO, constructor::Constructor; kwargs...) = load(TokenStream(input), constructor; kwargs...)
-
