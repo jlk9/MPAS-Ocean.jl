@@ -161,14 +161,16 @@ function index_to_period(captures)
     idx == 6 && return Second(captures[idx])
 end
 
-function DateTime_from_String(s::String)
-    mat = match(timestamp_pat, s)
+function DateTime_from_String(string::String)
+
+    mat = match(timestamp_pat, string)
+
     if mat === nothing
         throw(YAML.ConstructorError(nothing, nothing,
             "could not make sense of timestamp format", node.start_mark))
     end
     
-    # In the case where all groups are passed, should be a DateTime type 
+    # If all fields are passed and non-zero, will be parsed as DateTime
     if all(mat.captures .!= nothing)
         h  = parse(Int, mat.captures[4])
         m  = parse(Int, mat.captures[5])
@@ -178,10 +180,10 @@ function DateTime_from_String(s::String)
         mn = parse(Int, mat.captures[2])
         dy = parse(Int, mat.captures[3])
         
+        # If month/day are equal to zero the string is a TimeInterval 
+        # (c.f. DateTime) so the `index_to_period` method will do the parsing
         if !any(iszero.((mn,dy)))
             return DateTime(yr, mn, dy, h, m, s)
-        else 
-            return "too complicated for right now"
         end
     end 
     
@@ -196,7 +198,6 @@ function DateTime_from_String(s::String)
         return index_to_period(captures)
     end 
     
-    # Need more error handling for intermediate cases
     h  = parse(Int, mat.captures[4])
     m  = parse(Int, mat.captures[5])
     s  = parse(Int, mat.captures[6])
@@ -204,29 +205,21 @@ function DateTime_from_String(s::String)
     # No Y/M/D info in timestamp
     if all(mat.captures[1:3] .=== nothing)
         return Time(h, m, s)
+    # When: "D_hh::mm::ss"
     elseif all(mat.captures[1:2] .=== nothing)
-    # add case for time detlas in months
-        
         if parse(Int, mat.captures[3]) == 0 
-            # return period, NOT time 
+            ## if days field is speficied but zero does this denotes a Period??
+            ## (c.f. Time), if so we should return a CompundPeriod type
             #return Hour(h) + Minute(m) + Second(s)
+            
+            # Do simple case of just returning a Time obj. for now
             return Time(h,m,s)
-        else 
-            return "time delta in days"
         end 
     end
 
-    yr = parse(Int, mat.captures[1])
-    mn = parse(Int, mat.captures[2])
-    dy = parse(Int, mat.captures[3])
+    @warn """ Failed to parse $(string) """
 
-
-	# handle the interval options, year is allowed to be zero 	 
-	# but month and day are not 
-	if any(iszero.((mn,dy)))
-		return "time delta in years"
-	end 
-
-    #return DateTime(yr, mn, dy, h, m, s)
+    # in the case where we fail to parse the DateTime/Period just return 
+    # the original string after having raised a warning
+    return string
 end
-
