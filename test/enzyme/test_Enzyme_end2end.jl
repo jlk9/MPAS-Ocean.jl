@@ -11,19 +11,14 @@ include("../utilities.jl")
 
 # Replace these with intertialgravity waves and a config file:
 const MESHES_DIR = joinpath(artifact"inertialGravityWave")
-resolution = "200km"
+resolution  = "200km"
 mesh_file   = joinpath(MESHES_DIR, "inertialGravityWave", resolution, "initial_state.nc")
 config_file = joinpath(MESHES_DIR, "inertialGravityWave", resolution, "config.yml")
-mesh_fn    = "initial_state.nc"
-config_fn  = "test_config_artifact.yml"
+mesh_fn     = "initial_state.nc"
+config_fn   = "test_config.yml"
 
-#@show config_url
-
-cp(mesh_file, mesh_fn)
-cp(config_file, config_fn)
-
-#Downloads.download(mesh_url, mesh_fn)
-#Downloads.download(config_url, config_fn)
+cp(mesh_file, mesh_fn; force=true)
+cp(config_file, config_fn; force=true)
 
 #backend = KA.CPU()
 backend = CUDABackend();
