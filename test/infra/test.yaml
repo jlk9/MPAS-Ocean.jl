@@ -1,0 +1,24 @@
+omega:
+  hmix:
+    hmix_String: Restart_timestamp
+    hmix_Float: 1.234567890
+    hmix_None: none
+    hmix_On: true
+    hmix_Off: false
+    hmix_Exp: 1.e25
+  streams:
+    intervals:
+      yearly_interval:  0001-00-00_00:00:00
+      monthly_interval: 0000-02-00_00:00:00
+      daily_interval:   0000-00-03_00:00:00
+      hourly_interval:  0000-00-00_04:00:00
+      minutes_interval: 0000-00-00_00:05:00
+      seconds_interval: 0000-00-00_00:00:06
+    datetimes:
+      NO_HMS:  0001-01-01_00:00:00
+      NO_MS:   0001-01-01_02:00:00
+      NO_S:    0001-01-01_02:03:00
+      NO_H:    0001-01-01_00:03:04
+      NO_HM:   0001-01-01_00:00:04
+      NO_HS:   0001-01-01_00:03:00
+      ALL_HMS: 0001-01-01_02:03:04
