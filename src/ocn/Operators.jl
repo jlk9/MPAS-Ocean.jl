@@ -11,9 +11,9 @@ using KernelAbstractions
 """
 @kernel function DivergenceOnCell_P1(temp, @Const(VecEdge), @Const(dvEdge), nEdges)
 
-    #iEdge, k = @index(Global, NTuple)
-    iEdge = @index(Global, Linear)
-    k = 1
+    iEdge, k = @index(Global, NTuple)
+    #iEdge = @index(Global, Linear)
+    #k = 1
     if iEdge < nEdges + 1
         @inbounds temp[k,iEdge] = VecEdge[k,iEdge] * dvEdge[iEdge]
     end
@@ -27,9 +27,9 @@ end
                                      @Const(edgeSignOnCell),
                                      @Const(areaCell)) #::Val{n}, where {n}
 
-    #iCell, k = @index(Global, NTuple)
-    iCell = @index(Global, Linear)
-    k = 1
+    iCell, k = @index(Global, NTuple)
+    #iCell = @index(Global, Linear)
+    #k = 1
 
     DivCell[k,iCell] = 0.0
 
@@ -57,8 +57,8 @@ function DivergenceOnCell!(DivCell, VecEdge, temp, Mesh::Mesh; backend=CUDABacke
     kernel1! = DivergenceOnCell_P1(backend, nthreads)
     kernel2! = DivergenceOnCell_P2(backend, nthreads)
     
-    #kernel1!(VecEdge, dvEdge, ndrange=(nEdges, nVertLevels))
-    kernel1!(temp, VecEdge, dvEdge, nEdges, ndrange=nEdges)
+    kernel1!(temp, VecEdge, dvEdge, nEdges, ndrange=(nEdges, nVertLevels))
+    #kernel1!(temp, VecEdge, dvEdge, nEdges, ndrange=nEdges)
     
     kernel2!(DivCell,
              temp,
@@ -66,8 +66,8 @@ function DivergenceOnCell!(DivCell, VecEdge, temp, Mesh::Mesh; backend=CUDABacke
              edgesOnCell,
              edgeSignOnCell,
              areaCell,
-             ndrange=nCells)
-             #ndrange=(nCells, nVertLevels))
+             #ndrange=nCells)
+             ndrange=(nCells, nVertLevels))
 
     KA.synchronize(backend)
     
@@ -128,9 +128,9 @@ end
                               @Const(vertexDegree))
 
     # global indicies over nVertices and vertexDegree
-    #iVertex, k = @index(Global, NTuple)
-    iVertex = @index(Global, Linear)
-    k = 1
+    iVertex, k = @index(Global, NTuple)
+    #iVertex = @index(Global, Linear)
+    #k = 1
    
     #CurlVertex[k, iVertex] = 0.0
 
@@ -169,8 +169,8 @@ function CurlOnVertex!(CurlVertex, VecEdge, Mesh::Mesh; backend = KA.CPU())
             edgeSignOnVertex, 
             areaTriangle,
             vertexDegree,
-            ndrange=nVertices)
-            #ndrange=(nVertices, nVertLevels))
+            #ndrange=nVertices)
+            ndrange=(nVertices, nVertLevels))
            
 
     KA.synchronize(backend)
