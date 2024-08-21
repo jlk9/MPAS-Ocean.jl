@@ -1,53 +1,62 @@
 using Test
-import YAML 
+using MOKA: ConfigRead, ConfigGet, GlobalConfig, yaml_config 
 
-include("../src/infra/Config.jl")
+#=
+omega:
+  hmix:
+    HmixString: Restart_timestamp
+    HmixFloat: 1.234567890
+    HmixNone: none
+    HmixOn: true
+    HmixOff: false
+    HmixExp: 1.e25
+    config_start_time: 0001-01-01_00:00:00
+    config_run_duration: 0000_10:00:00
+    config_output_reference_time: 0001-01-01_00:00:00
+  hmix:
+    config_test_logical: false
+    config_test_float: -1.0
+    config_test_exponent: 1.0e5
+    config_test_integer: 10
+    config_test_string: output_interval
+  streams
+    restart:
+      type: input;output
+      filename_template: restarts/restart.$Y-$M-$D_$h.$m.$s.nc
+      filename_interval: output_interval
+      reference_time: 0001-01-01_00:00:00
+      clobber_mode: truncate
+      input_interval: initial_only
+      output_interval: 0005_00:00:00
+    output:
+      type: output
+      filename_template: output.nc
+      filename_interval: 01-00-00_00:00:00
+      reference_time: 0001-01-01_00:00:00
+      clobber_mode: truncate
+      precision: double
+      output_interval: 0000_10:00:00
+      contents:
+      - xtime
+      - normalVelocity
+      - layerThickness
+      - ssh
+=#
 
+RefHmixString = "Restart_timestamp"
+RefHmixFloat  = 1.234567890
+RefHmixNone   = nothing
+RefHmixOn     = true
+RefHmixOff    = false
+RefHmixExp    = 1.e25
 
-# I'm not sure this is worth it. 
-@test typeof(namelist_config(Dict{}())) == namelist_config
-@test typeof(streams_config(Dict{}())) == streams_config 
+path="test.yaml"
 
-dict_type = Dict{String, Any}
+# Build up a reference configuration
+ConfigMokaAll  = GlobalConfig()
+ConfigMokaHmix = yaml_config()
 
-namelist_test = dict_type("hmix" => dict_type("config_hmix_ref_cell_width" => 30000.0, 
-                                              "config_apvm_scale_factor" => 0.0, 
-                                              "config_hmix_scaleWithMesh" => false, 
-                                              "config_maxMeshDensity" => -1.0, 
-                                              "config_hmix_use_ref_cell_width" => false),
-
-                         "time_management" => dict_type("config_run_duration" => "0010_00:00:00", 
-                                                        "config_do_restart" => false, 
-                                                        "config_calendar_type" => "noleap", 
-                                                        "config_restart_timestamp_name" => "Restart_timestamp", 
-                                                        "config_stop_time" => "none", 
-                                                        "config_output_reference_time" => "0001-01-01_00:00:00", 
-                                                        "config_start_time" => "0001-01-01_00:00:00"))
-# Test dictionary to write to temp file
-streams_test = dict_type("streams" => dict_type(
-                                      dict_type("mesh" => dict_type("type" => "input", 
-                                                                    "filename_template"=>"init.nc", 
-                                                                    "input_interval" => "initial_only"), 
-
-                                                "output" => dict_type("filename_interval" => "01-00-00_00:00:00", 
-                                                                      "clobber_mode" => "truncate", 
-                                                                      "filename_template" => "output.nc", 
-                                                                      "output_interval" => "0000_10:00:00", 
-                                                                      "contents" => ["xtime", "normalVelocity", "layerThickness", "ssh"], 
-                                                                      "precision" => "double", 
-                                                                      "type" => "output", 
-                                                                      "reference_time" => "0001-01-01_00:00:00"))))
-
-
-
-
-# pack the namelist and stream dictionaries into to a test YAML dictionary 
-YAML_test = dict_type("omega" => merge(namelist_test, streams_test))
-
-mktemp("") do path, io
-    # write the test dictionary to the temporary file 
-    YAML.write_file(path, YAML_test)
-    
+#mktemp("") do path, io
     # read the test configuration file from the temporary file 
     config = ConfigRead(path)
 
@@ -58,7 +67,7 @@ mktemp("") do path, io
 
     @test hmixRefCellWidth ≈ 30000.0
 
-end 
+#end 
 
 
 
