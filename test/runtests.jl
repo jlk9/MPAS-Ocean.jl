@@ -3,6 +3,7 @@ using Test
 @testset "Moka" begin 
 
     @testset "Infrastructre Test" begin
+        include("infra/test_Config.jl")
         include("infra/test_timeManager.jl")
     end
 

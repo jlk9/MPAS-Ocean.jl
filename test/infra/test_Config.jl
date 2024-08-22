@@ -10,8 +10,8 @@ ref_hmix_On     = true
 ref_hmix_Off    = false
 ref_hmix_Exp    = 1.e25
 
-# read the test configuration file from the temporary file 
-config = ConfigRead("test.yaml")
+# read the test configuration file in the "test/infra" folder
+config = ConfigRead(joinpath(@__DIR__, "test.yaml"))
 
 # parse 
 hmixConfig      = ConfigGet(config.namelist, "hmix")
