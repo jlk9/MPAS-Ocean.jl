@@ -1,5 +1,7 @@
 using Test
 
+include("utilities.jl")
+
 @testset "Moka" begin 
 
     @testset "Infrastructre Test" begin

@@ -7,9 +7,6 @@ import MOKA.ocn_run_loop
 
 using LazyArtifacts
 
-# include the testcase definition utilities
-include("../utilities.jl")
-
 # Replace these with intertialgravity waves and a config file:
 const MESHES_DIR = joinpath(artifact"inertialGravityWave")
 resolution  = "200km"
