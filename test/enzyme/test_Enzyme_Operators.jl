@@ -17,6 +17,7 @@ mesh_fn  = "MokaMesh.nc"
 
 Downloads.download(mesh_url, mesh_fn)
 
+let 
 backends = [KA.CPU(), CUDABackend()]
 for backend in backends
     @show backend
@@ -223,4 +224,6 @@ for backend in backends
     elseif backend == CUDABackend()
         @test isapprox(dnorm_dvecedge_fwd, dnorm_dvecedge_fd, atol=1e-6)
     end
+end
+
 end
