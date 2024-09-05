@@ -22,6 +22,7 @@ Downloads.download(mesh_url, mesh_fn)
 
 backends = [KA.CPU(), CUDABackend()]
 for backend in backends
+    @show backend
     # Read in the purely horizontal doubly periodic testing mesh
     HorzMesh = ReadHorzMesh(mesh_fn; backend=backend)
     # Create a dummy vertical mesh from the horizontal mesh
@@ -82,7 +83,7 @@ for backend in backends
     end
     
     if backend == CUDABackend()
-        @test_broken fwd_mode
+        @test fwd_mode
     else 
         @test fwd_mode
     end
@@ -173,7 +174,7 @@ for backend in backends
     catch e
         fwd_mode = false
     end
-    @test_broken fwd_mode
+    @test fwd_mode
 
     @allowscalar dnorm_dvecedge_fwd = d_divNum[kEnd]
     HorzMeshFD = ReadHorzMesh(mesh_fn; backend=backend)
@@ -204,5 +205,9 @@ for backend in backends
     Finite differences computed $dnorm_dvecedge_fd
     """
     @test isapprox(dnorm_dvecedge_rev, dnorm_dvecedge_fd, atol=1e-6)
-    @test_broken isapprox(dnorm_dvecedge_fwd, dnorm_dvecedge_fd, atol=1e-6)
+    if backend == KA.CPU()
+        @test isapprox(dnorm_dvecedge_fwd, dnorm_dvecedge_fd, atol=1e-6)
+    elseif backend == CUDABackend()
+        @test_broken isapprox(dnorm_dvecedge_fwd, dnorm_dvecedge_fd, atol=1e-6)
+    end
 end
