@@ -9,7 +9,7 @@ using KernelAbstractions
 
 function advanceTimeLevels!(Prog::PrognosticVars; backend=CUDABackend())
 
-    nthreads = 100
+    nthreads = 64
 
     kernel2d! = advance_2d_array(backend, nthreads)
     kernel3d! = advance_3d_array(backend, nthreads)

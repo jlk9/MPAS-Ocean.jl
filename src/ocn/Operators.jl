@@ -43,7 +43,7 @@ end
     @synchronize()
 end
 
-function DivergenceOnCell!(DivCell, VecEdge, temp, Mesh::Mesh; backend=CUDABackend(), nthreads=50)
+function DivergenceOnCell!(DivCell, VecEdge, temp, Mesh::Mesh; backend=CUDABackend(), nthreads=64)
     
     @unpack HorzMesh, VertMesh = Mesh    
     @unpack PrimaryCells, DualCells, Edges = HorzMesh
@@ -159,7 +159,7 @@ function CurlOnVertex!(CurlVertex, VecEdge, Mesh::Mesh; backend = KA.CPU())
     @unpack nVertices, vertexDegree = DualCells
     @unpack areaTriangle, edgeSignOnVertex, edgesOnVertex = DualCells
 
-    nthreads = 50
+    nthreads = 64
     kernel!  = CurlOnVertex(backend, nthreads)
     
     kernel!(CurlVertex,
@@ -185,7 +185,7 @@ function interpolateCell2Edge!(edgeValue, cellValue, Mesh::Mesh;
     @unpack nVertLevels = VertMesh 
     @unpack nEdges, cellsOnEdge = Edges
 
-    nthreads = 50
+    nthreads = 64
     kernel!  = interpolateCell2Edge(backend, nthreads)
 
     kernel!(edgeValue,
