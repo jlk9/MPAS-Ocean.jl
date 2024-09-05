@@ -65,6 +65,14 @@ for backend in backends
                         Const(backend))
     @allowscalar dnorm_dscalar_rev = d_Scalar[kBegin]
 
+    # Read in the purely horizontal doubly periodic testing mesh
+    HorzMesh = ReadHorzMesh(mesh_fn; backend=backend)
+    # Create a dummy vertical mesh from the horizontal mesh
+    VertMesh = VerticalMesh(HorzMesh; nVertLevels=1, backend=backend)
+    # Create a the full Mesh strucutre 
+    MPASMesh = Mesh(HorzMesh, VertMesh)
+
+    setup = TestSetup(MPASMesh, PlanarTest; backend=backend)
     fill!(d_gradNum, 0.0)
     fill!(d_Scalar, 0.0)
     d_MPASMesh = Enzyme.make_zero(MPASMesh)
@@ -154,6 +162,14 @@ for backend in backends
                         Duplicated(deepcopy(MPASMesh), d_MPASMesh),
                         Const(backend))
     @allowscalar dnorm_dvecedge_rev    = d_VecEdge[kBegin]
+    # Read in the purely horizontal doubly periodic testing mesh
+    HorzMesh = ReadHorzMesh(mesh_fn; backend=backend)
+    # Create a dummy vertical mesh from the horizontal mesh
+    VertMesh = VerticalMesh(HorzMesh; nVertLevels=1, backend=backend)
+    # Create a the full Mesh strucutre 
+    MPASMesh = Mesh(HorzMesh, VertMesh)
+
+    setup = TestSetup(MPASMesh, PlanarTest; backend=backend)
     fill!(d_divNum, 0.0)
     fill!(d_VecEdge, 0.0)
     fill!(d_temp, 0.0)
@@ -208,6 +224,6 @@ for backend in backends
     if backend == KA.CPU()
         @test isapprox(dnorm_dvecedge_fwd, dnorm_dvecedge_fd, atol=1e-6)
     elseif backend == CUDABackend()
-        @test_broken isapprox(dnorm_dvecedge_fwd, dnorm_dvecedge_fd, atol=1e-6)
+        @test isapprox(dnorm_dvecedge_fwd, dnorm_dvecedge_fd, atol=1e-6)
     end
 end
